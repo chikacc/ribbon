@@ -9,7 +9,7 @@ const PROPS = {
   hasSurvey: false,
   isWorking: false,
   maxRows: 12,
-  bodyColumns: 80,
+  bodyColumns: 140,
   scroll: { offset: 0, bodyRows: 12 },
   view: {},
 } as const
@@ -52,8 +52,8 @@ test('a cold cache opens the card with the re-cache price, and Hide folds it to 
   const card = await band.find({ key: 'card' })
   expect(card).toBeDefined()
   expect(JSON.stringify(card)).toContain('Cache cold. Idle 3d 9h. Next message re-caches 770k tokens.')
-  // The page's width: 80 columns is a 1020 px band.
-  expect(JSON.stringify(card)).toContain('width=\\"1020\\"')
+  // The page's width: 140 columns is a 1740 px band.
+  expect(JSON.stringify(card)).toContain('width=\\"1740\\"')
 
   await band.press({ key: 'cache-fold' })
   expect(await band.find({ key: 'card' })).toBeUndefined()
@@ -117,5 +117,133 @@ test('a cleared session drops the cache until the next reply', async ($, on) => 
   const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await band.findAll({ type: 'Svg' })).toEqual([])
   expect(await band.find({ text: ' 99% left' })).toBeDefined()
+  await band.unmount()
+})
+
+const FIVE_MIN_TAIL = [
+  'cut mid-line',
+  JSON.stringify({ type: 'assistant', isSidechain: false, message: { usage: { cache_creation: { ephemeral_5m_input_tokens: 2000, ephemeral_1h_input_tokens: 0 } } } }),
+].join('\n')
+
+test('after a resume the cold price is Claude Code\'s own estimate, not the table\'s', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5', estimated_cache_write_usd: 5.5 })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: '$5.50' }), 'the estimate').toBeDefined()
+  expect(await band.find({ text: '$6.16' }), 'not the table').toBeUndefined()
+  await band.unmount()
+})
+
+test('a session on the 5-minute cache goes cold after 5 minutes and prices the 1.25x write', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: FIVE_MIN_TAIL, stderr: '' } }) as never)
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 6 * 60, context_tokens: 770000, model: 'claude-opus-5-5', transcript_path: '/work/t.jsonl' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: ' COLD ' })).toBeDefined()
+  // Opus 5.5: 770k tokens at the 5-minute write price, 1.25 x $4 per million.
+  expect(await band.find({ text: '$3.85' })).toBeDefined()
+  await band.unmount()
+})
+
+test('with no transcript to read, the cache keeps its 1-hour length', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 6 * 60, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: ' 54m left' })).toBeDefined()
+  await band.unmount()
+})
+
+test('between the compact and full widths the band stays one row, in short words', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  for (const bodyColumns of [70, 90]) {
+    const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
+    expect(await band.find({ key: 'cache' })).toBeUndefined()
+    expect(await band.find({ text: 'USAGE' })).toBeUndefined()
+    expect(await band.find({ text: '82%' })).toBeDefined()
+    expect(await band.find({ text: '3h29m' })).toBeDefined()
+    expect(await band.find({ text: '42m' })).toBeDefined()
+    expect((await band.find({ key: 'cache-fold' }))?.props.label).toBe('Show')
+    // The context gauge (770k of 1M used) needs room for its extra bar: it joins at 90 columns, not 70.
+    expect(await band.find({ text: ' 23%' }) !== undefined).toBe(bodyColumns === 90)
+    await band.unmount()
+  }
+})
+
+test('a folded cold cache on the short row shows the price, or the idle time for an unpriced model', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 90 } })
+  await band.press({ key: 'cache-fold' })
+  expect(await band.find({ key: 'card' })).toBeUndefined()
+  expect(await band.find({ text: '$6.16' })).toBeDefined()
+  expect(await band.find({ text: '3d 9h' })).toBeUndefined()
+  await band.unmount()
+
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'some-unpriced-model' })
+  const unpriced = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 90 } })
+  expect(await unpriced.find({ text: '3d9h' })).toBeDefined()
+  await unpriced.unmount()
+})
+
+test('the terminal draws the short row as text too', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 80 } })
+  expect(await band.findAll({ type: 'Svg' })).toEqual([])
+  expect(await band.find({ text: 'WARM' })).toBeDefined()
+  expect(await band.find({ text: '42m' })).toBeDefined()
+  expect(await band.find({ text: 'USAGE' })).toBeUndefined()
+  await band.unmount()
+})
+
+test('the full row adds a CTX gauge with the share of the context window left', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: 'CTX ' })).toBeDefined()
+  expect(await band.find({ text: ' 23% left' })).toBeDefined()
   await band.unmount()
 })

@@ -62,9 +62,12 @@ In a Claude Code terminal session, type:
 - Under each one is when it resets, for example `resets 3d 9h`.
 - If a window drops under 15%, a bold **LOW** shows next to it.
 
+- **CTX** (violet) is how much of the context window is left, shown after the first reply when the row has room.
+- The band has no background of its own: it follows the app's light or dark theme.
+
 ### The prompt cache
 
-After your first reply, the band also tracks the prompt cache. The cache keeps your chat cheap to continue for one hour after your last message.
+After your first reply, the band also tracks the prompt cache. The cache keeps your chat cheap to continue for one hour after your last message (five minutes on plans that use the short cache; ribbon reads which from the transcript).
 
 - **WARM** (red, the robot bobs): the cache is live. It shows the minutes left and what your next message costs.
 - **COLD** (blue, the robot is frozen): the hour has passed. Your next message re-sends the whole chat, so it costs more. It shows the price first.
@@ -76,6 +79,7 @@ The card shows how long you've been idle, how many tokens are in the cache, and 
 ### Fits any width
 
 - **Wide:** everything on one row.
+- **Medium:** still one row, in short words: no label, `94% 2d5h`, and the cache as `WARM 60m` or the price.
 - **Half width:** each window stacks into a small block.
 - **Narrow:** the cache moves to its own row.
 - **Terminal:** the same facts as plain text.
