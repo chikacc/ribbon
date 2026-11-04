@@ -276,7 +276,10 @@ type TextOpts = { size?: number; w?: number; fill?: string; ls?: number; anchor?
 /** The gap between the row and the card, drawn inside the card. */
 const CARD_TOP = 6
 
-export const cardSvg = (v: CacheView, kind: Kind, W: number): { source: string; w: number; h: number; alt: string } => {
+/** A footer line group under the card: the first line in `color`, the rest dim. */
+export type CardNote = { color: string; lines: string[] }
+
+export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): { source: string; w: number; h: number; alt: string } => {
   const mode = v.mode
   const cold = mode === 'cold'
   const HUEM = HUE[mode]
@@ -390,6 +393,13 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number): { source: string; 
       zoneSize(13, 110, W - 26, { compact: true }) +
       hline(180) +
       zoneCost(13, 182, (W - 26) / 4, { compact: true })
+  }
+  if (note && note.lines.length > 0) {
+    g += hline(H)
+    note.lines.forEach((line, i) => {
+      g += t(13, H + 24 + i * 18, line, i === 0 ? { size: 13, fill: note.color } : { size: 12, w: 500 })
+    })
+    H += 14 + note.lines.length * 18 + 8
   }
   const h = H + CARD_TOP
   const body = `<g transform="translate(0 ${CARD_TOP})">` + hline(0) + g + '</g>'

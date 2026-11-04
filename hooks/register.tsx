@@ -308,25 +308,12 @@ export const register: Register = (on, options) => {
         }
       }
 
-      // The 7-day limit running out early. In the app the warning takes the reset countdown's
-      // place and the reset moves to the hover card; the terminal has no hover, so it adds to the row.
+      // The 7-day limit running out early. Where the Show card can hold the details (the app, once
+      // there is a cache to show) the warning takes the reset countdown's place and the card says
+      // the rest; otherwise it adds to the row.
+      const detail = Svg !== null && !!view
       const warning = (p: ReturnType<typeof parts>, form: 'long' | 'short') =>
         p.out ? <Text color={p.outCol} bold>{form === 'long' ? ' · ' : ' '}⚠ {dayPart(p.out.at, form === 'short')}</Text> : null
-      const tip = (p: ReturnType<typeof parts>) => {
-        if (!p.out || !Svg) return null
-        const o = p.out
-        // An indented line is a detail of the one above it: dim.
-        const lines = [
-          `At this week's pace (${Math.round(o.gained)}% in ${fmtIdle(o.over)})`,
-          `  the 7-day limit runs out ${dayPart(o.at)}, around ${clockOf(o.at)},`,
-          `  before it resets on ${dateOf(o.resetMs)}, in ${fmtIdle(o.resetMs - now)}.`,
-        ]
-        return (
-          <Box position="absolute" bottom={1} left={0} display="none" hover={{ display: 'flex' }} flexDirection="column" paddingX={1} borderStyle="round" borderColor="subtle" backgroundColor="background">
-            {lines.map((line, i) => <Text key={`t${i}`} dimColor={line.startsWith('  ')}>{line}</Text>)}
-          </Box>
-        )
-      }
 
       // Wide: every window on one row. Narrow: each window is a block of three
       // lines (name and dots, percent left, reset time) so nothing wraps or clips.
@@ -339,9 +326,8 @@ export const register: Register = (on, options) => {
             <Text color={EMPTY}>{p.d.off}</Text>
             <Text color={p.col} bold> {p.fig}% {p.word}</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
-            {p.reset && !(p.out && Svg) ? <Text color={MUTED}> · {p.reset}</Text> : null}
+            {p.reset && !(p.out && detail) ? <Text color={MUTED}> · {p.reset}</Text> : null}
             {warning(p, 'long')}
-            {tip(p)}
           </Box>
         )
       }
@@ -356,9 +342,8 @@ export const register: Register = (on, options) => {
             <Text color={EMPTY}>{p.d.off}</Text>
             <Text color={p.col} bold> {Math.round(p.fig)}%</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
-            {p.reset && !(p.out && Svg) ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
+            {p.reset && !(p.out && detail) ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
             {Svg ? warning(p, 'short') : null}
-            {tip(p)}
           </Box>
         )
       }
@@ -376,8 +361,7 @@ export const register: Register = (on, options) => {
               <Text color={p.col} bold>{p.fig}% {p.word}</Text>
               {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
             </Box>
-            {p.out && Svg ? <Text color={p.outCol} bold>⚠ {dayPart(p.out.at, true)}</Text> : p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}
-            {tip(p)}
+            {p.out && detail ? <Text color={p.outCol} bold>⚠ {dayPart(p.out.at, true)}</Text> : p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}
           </Box>
         )
       }
@@ -499,7 +483,18 @@ export const register: Register = (on, options) => {
 
       let card = null
       if (open && Svg) {
-        const c = cardSvg(view, kind, bandPx(columns))
+        const o = list.map(w => ({ w, out: runOutOf(w.kind, w.percentUsed, w.resetsAt, now) })).find(x => x.out)
+      const note = o?.out
+        ? {
+            color: o.out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
+            lines: [
+              `7-day limit runs out ${dayPart(o.out.at)}, around ${clockOf(o.out.at)}`,
+              `At this week's pace: ${Math.round(o.out.gained)}% used in ${fmtIdle(o.out.over)}`,
+              `It resets ${dateOf(o.out.resetMs)}, in ${fmtIdle(o.out.resetMs - now)}`,
+            ],
+          }
+        : undefined
+      const c = cardSvg(view, kind, bandPx(columns), note)
         card = (
           <Box key="card" flexDirection="row">
             <Svg source={c.source} alt={c.alt} width={c.w} height={c.h} isInteractive={kind !== 'tight'} />

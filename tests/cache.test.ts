@@ -315,24 +315,35 @@ test('the windows are coloured by their pace, not by which window they are', asy
   await band.unmount()
 })
 
-test('a 7-day limit set to run out early shows the warning in place of the reset, and the details on hover', async ($, on) => {
+test('a 7-day limit set to run out early shows the warning in the row and the details in the Show card', async ($, on) => {
   mock.store(on)
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('classic.SessionStart', () => ({}))
   // 4 days into the week with 70% used.
   const rateLimits = [{ kind: 'seven_day', percentUsed: 70, resetsAt: new Date(NOW + 3 * 86_400_000).toISOString() }]
-  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits } }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits } }))
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
 
+  // Before the first reply there is no card to hold the details: the row keeps the reset.
+  const early = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await early.find({ type: 'Text', text: '⚠' })).toBeDefined()
+  expect(await early.find({ type: 'Text', text: ' · 3d 0h' })).toBeDefined()
+  await early.unmount()
+
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
   const app = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await app.find({ type: 'Text', text: '⚠' })).toBeDefined()
   expect(await app.find({ type: 'Text', text: ' · 3d 0h' })).toBeUndefined() // the reset left the row
-  expect(await app.find({ type: 'Text', text: "At this week's pace (70% in 4d 0h)" })).toBeDefined()
+  expect(await app.find({ key: 'card' })).toBeUndefined() // a warm cache starts folded
+  await app.press({ key: 'cache-fold' })
+  const card = await app.find({ key: 'card' })
+  expect(JSON.stringify(card)).toContain('7-day limit runs out')
+  expect(JSON.stringify(card)).toContain('70% used in 4d 0h')
   await app.unmount()
 
   const term = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
   expect(await term.find({ type: 'Text', text: '⚠' })).toBeDefined()
-  expect(await term.find({ type: 'Text', text: ' · 3d 0h' })).toBeDefined() // no hover: the reset stays
-  expect(await term.find({ type: 'Text', text: "At this week's pace" })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: ' · 3d 0h' })).toBeDefined() // no card: the reset stays
   await term.unmount()
 })
