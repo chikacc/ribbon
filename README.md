@@ -62,8 +62,14 @@ In a Claude Code terminal session, type:
 - Under each one is when it resets, for example `resets 3d 9h`.
 - If a window drops under 15%, a bold **LOW** shows next to it.
 
-- **CTX** (violet) is how much of the context window is left, shown after the first reply when the row has room.
+- **CTX** (violet) is how much of the context window is left, with the token count (`770k/1M`), shown after the first reply when the row has room.
 - The band has no background of its own: it follows the app's light or dark theme.
+
+### Settings
+
+Open `/config` and find **ribbon**, or run `claude plugin configure ribbon@robonuggets`.
+
+- **Usage figure:** `left` (default) shows how much of each window and of the context is left. `used` shows how much is spent, and the dots fill with it. LOW still means under 15% left.
 
 ### The prompt cache
 

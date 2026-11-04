@@ -4,7 +4,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { CacheFacts, Fold, Window } from '../types'
 import {
   HUE, INK, ORANGE, ROBO_SIZE, TTL_MIN, VIOLET, WORD, YELLOW,
-  bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, priceOf, roboSvg, usd,
+  bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
 import { TAIL_BYTES, lastReply, ttlFromTail } from './ttl'
@@ -33,8 +33,8 @@ const FULL_AT = 106
 const COMPACT_AT = 66
 const COMPACT_CELLS = 5
 /** Extra columns the CTX gauge costs on the full row, and on the compact one. */
-const CTX_FULL = 26
-const CTX_COMPACT = 15
+const CTX_FULL = 36
+const CTX_COMPACT = 20
 /** How often the band redraws, so the countdown and the warm-to-cold flip stay current. */
 const TICK_MS = 30_000
 
@@ -154,7 +154,10 @@ const measure = async ($: EngineInterface, lastAt: number | null, model: string 
   }))
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  // userConfig `usage`: whether the bars show what is left (default) or what is used.
+  const used = options.usage === 'used'
+
   on('session.start', async ($, e, next) => {
     await pull($)
     await seedFromTranscript($).catch(() => undefined)
@@ -251,18 +254,22 @@ export const register: Register = on => {
       const cells = compact ? COMPACT_CELLS : kind === 'tight' ? TIGHT_CELLS : CELLS
       const ctx: Window[] =
         view && hasCtx && (columns >= fullAt || columns >= COMPACT_AT + CTX_COMPACT)
-          ? [{ kind: 'context', percentUsed: Math.min(100, (view.tokens / view.window) * 100) }]
+          ? [{ kind: 'context', percentUsed: Math.min(100, (view.tokens / view.window) * 100), note: compact ? tok(view.tokens) : `${tok(view.tokens)}/${tok(view.window)}` }]
           : []
       const list = [...saved, ...ctx]
 
       const parts = (w: Window) => {
         const left = Math.max(0, Math.round((100 - w.percentUsed) * 10) / 10)
+        // The figure and the filled dots follow the setting; LOW always looks at what is left.
+        const fig = used ? Math.min(100, Math.round(w.percentUsed * 10) / 10) : left
         return {
           left,
+          fig,
+          word: used ? 'used' : 'left',
           col: COLORS[w.kind] ?? TEXT,
           name: NAMES[w.kind] ?? w.kind.toUpperCase(),
-          d: dots(left, cells),
-          reset: fmtReset(w.resetsAt, now),
+          d: dots(fig, cells),
+          reset: w.note ?? fmtReset(w.resetsAt, now),
         }
       }
 
@@ -275,7 +282,7 @@ export const register: Register = on => {
             <Text color={MUTED} bold>{p.name} </Text>
             <Text color={p.col}>{p.d.on}</Text>
             <Text color={EMPTY}>{p.d.off}</Text>
-            <Text color={p.col} bold> {p.left}% left</Text>
+            <Text color={p.col} bold> {p.fig}% {p.word}</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
             {p.reset ? <Text color={MUTED}> · {p.reset}</Text> : null}
           </Box>
@@ -290,7 +297,7 @@ export const register: Register = on => {
             <Text color={MUTED} bold>{p.name} </Text>
             <Text color={p.col}>{p.d.on}</Text>
             <Text color={EMPTY}>{p.d.off}</Text>
-            <Text color={p.col} bold> {Math.round(p.left)}%</Text>
+            <Text color={p.col} bold> {Math.round(p.fig)}%</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
             {p.reset ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
           </Box>
@@ -307,7 +314,7 @@ export const register: Register = on => {
               <Text color={EMPTY}>{p.d.off}</Text>
             </Box>
             <Box flexDirection="row">
-              <Text color={p.col} bold>{p.left}% left</Text>
+              <Text color={p.col} bold>{p.fig}% {p.word}</Text>
               {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
             </Box>
             {p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}

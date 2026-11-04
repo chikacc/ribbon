@@ -9,7 +9,7 @@ const PROPS = {
   hasSurvey: false,
   isWorking: false,
   maxRows: 12,
-  bodyColumns: 140,
+  bodyColumns: 150,
   scroll: { offset: 0, bodyRows: 12 },
   view: {},
 } as const
@@ -52,8 +52,8 @@ test('a cold cache opens the card with the re-cache price, and Hide folds it to 
   const card = await band.find({ key: 'card' })
   expect(card).toBeDefined()
   expect(JSON.stringify(card)).toContain('Cache cold. Idle 3d 9h. Next message re-caches 770k tokens.')
-  // The page's width: 140 columns is a 1740 px band.
-  expect(JSON.stringify(card)).toContain('width=\\"1740\\"')
+  // The page's width: 150 columns is a 1860 px band.
+  expect(JSON.stringify(card)).toContain('width=\\"1860\\"')
 
   await band.press({ key: 'cache-fold' })
   expect(await band.find({ key: 'card' })).toBeUndefined()
@@ -245,5 +245,23 @@ test('the full row adds a CTX gauge with the share of the context window left', 
   const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await band.find({ text: 'CTX ' })).toBeDefined()
   expect(await band.find({ text: ' 23% left' })).toBeDefined()
+  expect(await band.find({ text: ' · 770k/1M' })).toBeDefined()
+  await band.unmount()
+})
+
+test('usage: used shows the spent share, the filled dots and the context as used', { options: { usage: 'used' } }, async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: ' 18% used' })).toBeDefined()
+  expect(await band.find({ text: ' 1% used' })).toBeDefined()
+  expect(await band.find({ text: ' 77% used' })).toBeDefined()
+  expect(await band.find({ text: ' 82% left' })).toBeUndefined()
   await band.unmount()
 })

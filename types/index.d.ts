@@ -1,5 +1,8 @@
-/** One usage window: which one, how much is used (0 to 100), when it resets. */
-export type Window = { kind: string; percentUsed: number; resetsAt?: string }
+/**
+ * One usage window: which one, how much is used (0 to 100), when it resets.
+ * `note` replaces the reset time, for a gauge that has none (the context's token count).
+ */
+export type Window = { kind: string; percentUsed: number; resetsAt?: string; note?: string }
 
 /**
  * The prompt cache as the band last saw it: when the main thread last sent a

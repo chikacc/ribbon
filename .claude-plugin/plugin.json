@@ -7,5 +7,14 @@
   "repository": "https://github.com/robonuggets/ribbon",
   "license": "MIT",
   "keywords": ["usage", "rate-limit", "prompt-cache", "cost", "status", "mod", "claude-code"],
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "usage": {
+      "type": "string",
+      "title": "Usage figure",
+      "description": "left shows how much of each window (and of the context) is left; used shows how much is spent",
+      "default": "left",
+      "options": ["left", "used"]
+    }
+  }
 }
