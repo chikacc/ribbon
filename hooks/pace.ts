@@ -22,3 +22,47 @@ export const toneOf = (kind: string, percentUsed: number, resetsAt: string | und
   }
   return used >= USED_ALERT || pace > PACE_ALERT ? 'alert' : pace > 0 ? 'fast' : 'calm'
 }
+
+const DAY = 86_400_000
+
+/** The 7-day limit running out before it resets, at this week's pace. */
+export type RunOut = { at: number; left: number; gained: number; over: number; resetMs: number }
+
+/**
+ * When the 7-day limit runs out at the week's pace (share used over time elapsed, as Claude's own
+ * usage page projects it), if that is before the reset. Not before a day of the week has passed
+ * or 15% is used: there is too little to go on. Null for every other window.
+ */
+export const runOutOf = (kind: string, percentUsed: number, resetsAt: string | undefined, now: number): RunOut | null => {
+  if (kind !== 'seven_day') return null
+  const resetMs = Date.parse(resetsAt ?? '')
+  if (!Number.isFinite(resetMs)) return null
+  const over = now - (resetMs - 7 * DAY)
+  if (over < DAY || percentUsed < 15 || percentUsed >= 100) return null
+  const at = now + ((100 - percentUsed) * over) / percentUsed
+  return at < resetMs ? { at, left: at - now, gained: percentUsed, over, resetMs } : null
+}
+
+/** Within a day of running out the warning turns red. */
+export const OUT_ALERT = DAY
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const two = (n: number) => String(n).padStart(2, '0')
+
+/** "Sun night", "Fri evening"; short: "Sun pm". The hours after midnight belong to the night before. */
+export const dayPart = (ms: number, short = false): string => {
+  const d = new Date(ms)
+  const h = d.getHours()
+  if (h < 6) return `${DAYS[(d.getDay() + 6) % 7]} ${short ? 'pm' : 'night'}`
+  const part = h < 12 ? ['am', 'morning'] : h < 18 ? ['pm', 'afternoon'] : ['pm', 'evening']
+  return `${DAYS[d.getDay()]} ${short ? part[0] : part[1]}`
+}
+
+export const clockOf = (ms: number): string => `${two(new Date(ms).getHours())}:${two(new Date(ms).getMinutes())}`
+
+/** "Mon 19 Oct". */
+export const dateOf = (ms: number): string => {
+  const d = new Date(ms)
+  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+}

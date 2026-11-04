@@ -63,6 +63,7 @@ In a Claude Code terminal session, type:
 - Under each one is when it resets, for example `resets 3d 9h`.
 - If a window drops under 15%, a bold **LOW** shows next to it.
 
+- **Run-out warning.** When this week's pace would use up the 7-day limit before it resets, 7D shows `⚠ Sun night` (when it runs out) in place of the reset countdown: yellow, red within a day. Hover it in the app for the numbers and the reset time. It needs a day of the week gone and 15% used; the terminal adds it to the row and keeps the reset.
 - **CTX** (violet) is how much of the context window is left, with the token count (`770k/1M`), shown after the first reply when the row has room.
 - The band has no background of its own: it follows the app's light or dark theme.
 

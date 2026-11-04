@@ -19,3 +19,28 @@ test('with no reset time or no known length only the 90% rule applies', () => {
   expect(toneOf('context', 90, undefined, NOW)).toBe('alert')
   expect(toneOf('five_hour', 80, in5h(9), NOW)).toBe('calm') // reset further off than the window is long: bad data
 })
+
+import { dayPart, runOutOf } from '../hooks/pace'
+
+test('the 7-day limit runs out early only when the week\'s pace says so', () => {
+  const day = 86_400_000
+  const reset = NOW + 3 * day // 4 days into the week
+  const iso = new Date(reset).toISOString()
+  // 70% in 4 days: 100% at day 5.7, before the reset at day 7.
+  const out = runOutOf('seven_day', 70, iso, NOW)
+  expect(out).not.toBeNull()
+  expect(Math.round(out!.left / day * 10) / 10).toBe(1.7)
+  expect(runOutOf('seven_day', 40, iso, NOW)).toBeNull() // lasts past the reset
+  expect(runOutOf('seven_day', 10, iso, NOW)).toBeNull() // under 15%: too little to go on
+  expect(runOutOf('seven_day', 100, iso, NOW)).toBeNull()
+  expect(runOutOf('seven_day', 70, new Date(NOW + 6.5 * day).toISOString(), NOW)).toBeNull() // under a day into the week
+  expect(runOutOf('five_hour', 70, iso, NOW)).toBeNull()
+})
+
+test('a time of day is a day and a part of it; the small hours belong to the night before', () => {
+  const at = (iso: string) => new Date(iso).getTime()
+  expect(dayPart(at('2026-10-18T22:00:00'))).toBe('Sun evening')
+  expect(dayPart(at('2026-10-19T00:42:00'))).toBe('Sun night')
+  expect(dayPart(at('2026-10-19T00:42:00'), true)).toBe('Sun pm')
+  expect(dayPart(at('2026-10-19T09:00:00'))).toBe('Mon morning')
+})

@@ -9,7 +9,7 @@ import {
 import type { CacheView } from './cache-art'
 import { TAIL_BYTES, lastReply, learnTtl, ruleTtl, ttlFromTail } from './ttl'
 import type { CacheEnv } from './ttl'
-import { toneOf } from './pace'
+import { OUT_ALERT, clockOf, dateOf, dayPart, runOutOf, toneOf } from './pace'
 
 // A band above the prompt in a warm dark look: card surface, cream text,
 // dot-matrix bars. Shows how much of each usage window is LEFT, 7-day first, then
@@ -292,6 +292,7 @@ export const register: Register = (on, options) => {
       const parts = (w: Window) => {
         const left = Math.max(0, Math.round((100 - w.percentUsed) * 10) / 10)
         const tone = toneOf(w.kind, w.percentUsed, w.resetsAt, now)
+        const out = runOutOf(w.kind, w.percentUsed, w.resetsAt, now)
         // The figure and the filled dots follow the setting; LOW always looks at what is left.
         const fig = used ? Math.min(100, Math.round(w.percentUsed * 10) / 10) : left
         return {
@@ -302,7 +303,29 @@ export const register: Register = (on, options) => {
           name: NAMES[w.kind] ?? w.kind.toUpperCase(),
           d: dots(fig, cells),
           reset: w.note ?? fmtReset(w.resetsAt, now),
+          out,
+          outCol: out && out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
         }
+      }
+
+      // The 7-day limit running out early. In the app the warning takes the reset countdown's
+      // place and the reset moves to the hover card; the terminal has no hover, so it adds to the row.
+      const warning = (p: ReturnType<typeof parts>, form: 'long' | 'short') =>
+        p.out ? <Text color={p.outCol} bold>{form === 'long' ? ' · ' : ' '}⚠ {dayPart(p.out.at, form === 'short')}</Text> : null
+      const tip = (p: ReturnType<typeof parts>) => {
+        if (!p.out || !Svg) return null
+        const o = p.out
+        // An indented line is a detail of the one above it: dim.
+        const lines = [
+          `At this week's pace (${Math.round(o.gained)}% in ${fmtIdle(o.over)})`,
+          `  the 7-day limit runs out ${dayPart(o.at)}, around ${clockOf(o.at)},`,
+          `  before it resets on ${dateOf(o.resetMs)}, in ${fmtIdle(o.resetMs - now)}.`,
+        ]
+        return (
+          <Box position="absolute" bottom={1} left={0} display="none" hover={{ display: 'flex' }} flexDirection="column" paddingX={1} borderStyle="round" borderColor="subtle" backgroundColor="background">
+            {lines.map((line, i) => <Text key={`t${i}`} dimColor={line.startsWith('  ')}>{line}</Text>)}
+          </Box>
+        )
       }
 
       // Wide: every window on one row. Narrow: each window is a block of three
@@ -316,7 +339,9 @@ export const register: Register = (on, options) => {
             <Text color={EMPTY}>{p.d.off}</Text>
             <Text color={p.col} bold> {p.fig}% {p.word}</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
-            {p.reset ? <Text color={MUTED}> · {p.reset}</Text> : null}
+            {p.reset && !(p.out && Svg) ? <Text color={MUTED}> · {p.reset}</Text> : null}
+            {warning(p, 'long')}
+            {tip(p)}
           </Box>
         )
       }
@@ -331,7 +356,9 @@ export const register: Register = (on, options) => {
             <Text color={EMPTY}>{p.d.off}</Text>
             <Text color={p.col} bold> {Math.round(p.fig)}%</Text>
             {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
-            {p.reset ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
+            {p.reset && !(p.out && Svg) ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
+            {Svg ? warning(p, 'short') : null}
+            {tip(p)}
           </Box>
         )
       }
@@ -349,7 +376,8 @@ export const register: Register = (on, options) => {
               <Text color={p.col} bold>{p.fig}% {p.word}</Text>
               {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
             </Box>
-            {p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}
+            {p.out && Svg ? <Text color={p.outCol} bold>⚠ {dayPart(p.out.at, true)}</Text> : p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}
+            {tip(p)}
           </Box>
         )
       }
