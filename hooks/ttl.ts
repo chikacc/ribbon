@@ -63,3 +63,38 @@ export function lastReply(tail: string): Reply | null {
   }
   return null
 }
+
+const FIVE_MIN = 5 * 60_000
+const HOUR = 60 * 60_000
+
+/** Claude Code's cache settings that fix the length. */
+export type CacheEnv = { force5m: boolean; ttl: string; enable1h: boolean }
+
+/**
+ * The cache length before any request shows it, by Claude Code's rules: the env settings, then
+ * 1 hour for a subscription still within its plan usage and 5 minutes for an API key or
+ * usage credits.
+ * shortcut: the plan check is a guess from the rate limits, upgrade once the engine names the plan.
+ */
+export function ruleTtl(env: CacheEnv, windows: readonly { kind: string; percentUsed: number }[]): 5 | 60 {
+  if (env.force5m) return 5
+  if (env.ttl === '5m') return 5
+  if (env.ttl === '1h' || env.enable1h) return 60
+  const plan = windows.filter(w => w.kind === 'five_hour' || w.kind === 'seven_day')
+  return plan.length > 0 && plan.every(w => w.percentUsed < 100) ? 60 : 5
+}
+
+export type Seen = { read: number; write: number; fresh: number }
+
+/**
+ * What a request shows about the cache's length, or null when it shows nothing. A hit more than
+ * 5 minutes after the last request proves the hour; a miss inside the hour, on the same model and
+ * with a prompt that did not shrink, says 5 minutes.
+ */
+export function learnTtl(gapMs: number, cur: Seen, sameModel: boolean, prevPrompt: number): 5 | 60 | null {
+  const prompt = cur.read + cur.write + cur.fresh
+  const missed = prompt > 0 && cur.read / prompt < 0.5 && cur.write > 1000
+  if (!missed && cur.read > 0 && gapMs > FIVE_MIN) return 60
+  if (missed && gapMs > FIVE_MIN && gapMs < HOUR && sameModel && prompt >= prevPrompt) return 5
+  return null
+}

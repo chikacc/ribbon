@@ -58,6 +58,41 @@ export const MODELS: Model[] = [
 
 const rateOf = (m: Model, tokens: number): Rate => (m.short && tokens <= m.short.upTo ? m.short : m)
 
+// Models whose prices differ from their MODELS row, by exact id (the pricing page, 2026-11-04).
+// The rows above are the 5.5 generation; a session on an older model gets its own rate.
+const OLDER: Record<string, Rate> = {
+  'claude-fable-5': { input: 10, read: 1 },
+  'claude-opus-5': { input: 5, read: 0.5 },
+  'claude-opus-4-8': { input: 5, read: 0.5 },
+  'claude-opus-4-7': { input: 5, read: 0.5 },
+  'claude-opus-4-6': { input: 5, read: 0.5 },
+  'claude-opus-4-5': { input: 5, read: 0.5 },
+  'claude-opus-4-1': { input: 15, read: 1.5 },
+  'claude-opus-4': { input: 15, read: 1.5 },
+  'claude-sonnet-5': { input: 2, read: 0.2 },
+  'claude-sonnet-4-6': { input: 3, read: 0.3 },
+  'claude-sonnet-4-5': { input: 3, read: 0.3 },
+  'claude-sonnet-4': { input: 3, read: 0.3 },
+  'claude-haiku-4-5': { input: 1, read: 0.1 },
+  'claude-haiku-3-5': { input: 0.8, read: 0.08 },
+}
+
+/**
+ * A model id as OLDER names it: lowercase, without a "[1m]" suffix, a Vertex "@date", a Bedrock
+ * "-v1:0", a trailing date or a provider prefix: "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+ * is "claude-sonnet-4-5".
+ */
+export const modelId = (model: string | null | undefined): string => {
+  const id = (model ?? '').trim().toLowerCase().replace(/\[[^\]]*\]$/, '').replace(/@[^@/]*$/, '').replace(/-v\d+(:\d+)?$/, '').replace(/-20\d{6}$/, '')
+  return id.slice(Math.max(id.lastIndexOf('.'), id.lastIndexOf('/')) + 1)
+}
+
+/** The rate of an older model, or undefined when its MODELS row prices it. */
+export const olderRate = (model: string | null | undefined): Rate | undefined => {
+  const id = modelId(model)
+  return Object.prototype.hasOwnProperty.call(OLDER, id) ? OLDER[id] : undefined
+}
+
 /** Which row of MODELS a model id belongs to, or null for one the card doesn't price. */
 export const familyOf = (model: string | null | undefined): string | null => {
   const m = (model ?? '').toLowerCase()
@@ -96,15 +131,23 @@ export type CacheView = {
   window: number
   /** This session's MODELS id, or null when the model isn't priced. */
   mine: string | null
+  /** The session's own rate when it is on an older model than its MODELS row. */
+  rate?: Rate
   /** Claude Code's own re-cache estimate after a resume; it wins over the table for this session's model. */
   usd?: number
 }
 
-export const mineModel = (v: CacheView): Model | undefined => MODELS.find(m => m.id === v.mine)
+/** A MODELS row as this session sees it: its own rate when it is on an older model. */
+const rowFor = (v: CacheView, m: Model): Model => (m.id === v.mine && v.rate ? { id: m.id, NAME: m.NAME, ...v.rate } : m)
+
+export const mineModel = (v: CacheView): Model | undefined => {
+  const m = MODELS.find(x => x.id === v.mine)
+  return m && rowFor(v, m)
+}
 
 /** What the next message costs on `m`: Claude Code's estimate when cold on this session's model, else the table's. */
 export const priceOf = (v: CacheView, m: Model): number =>
-  v.mode === 'cold' && v.usd !== undefined && m.id === v.mine ? v.usd : costOf(m, v.mode, v.tokens, v.ttlMin)
+  v.mode === 'cold' && v.usd !== undefined && m.id === v.mine ? v.usd : costOf(rowFor(v, m), v.mode, v.tokens, v.ttlMin)
 
 // ---------- SVG helpers ----------
 // In a light theme, CSS remaps the dark palette: a style rule outranks a fill attribute.
@@ -307,7 +350,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number): { source: string; 
       ? { lab: 24, base: 100, rows: 6, step: 7, chip: 58, price: 88, name: 102 }
       : { lab: 30, base: 116, rows: 8, step: 8, chip: 70, price: 104, name: 120 }
     let g = t(x, y + k.lab, cold ? 'NEXT MESSAGE COSTS' : 'NEXT MESSAGE COSTS, CACHED', { ls: 1.4 })
-    const top = Math.max(...MODELS.map(m => coldCost(m, v.tokens, v.ttlMin)))
+    const top = Math.max(...MODELS.map(m => coldCost(rowFor(v, m), v.tokens, v.ttlMin)))
     MODELS.forEach((m, i) => {
       const mine = m.id === v.mine
       const n = top > 0 ? Math.max(1, Math.round((priceOf(v, m) / top) * k.rows)) : 1

@@ -4,10 +4,11 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { CacheFacts, Fold, Window } from '../types'
 import {
   HUE, INK, ORANGE, ROBO_SIZE, TTL_MIN, VIOLET, WORD, YELLOW,
-  bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, priceOf, roboSvg, tok, usd,
+  bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
-import { TAIL_BYTES, lastReply, ttlFromTail } from './ttl'
+import { TAIL_BYTES, lastReply, learnTtl, ruleTtl, ttlFromTail } from './ttl'
+import type { CacheEnv } from './ttl'
 
 // A band above the prompt in a warm dark look: card surface, cream text,
 // dot-matrix bars. Shows how much of each usage window is LEFT, 7-day first, then
@@ -69,10 +70,11 @@ const fmtReset = (iso: string | undefined, now: number): string => {
 }
 
 /** What the cache drawings read, or null until a request and its context size are known. */
-export const viewOf = (c: CacheFacts | null, now: number): CacheView | null => {
+export const viewOf = (c: CacheFacts | null, now: number, fallbackMin = TTL_MIN): CacheView | null => {
   if (!c || c.lastAt <= 0 || c.tokens <= 0) return null
   const idleMs = Math.max(0, now - c.lastAt)
-  const ttlMin = c.ttlMin ?? TTL_MIN
+  const ttlMin = c.ttlMin ?? fallbackMin
+  const rate = olderRate(c.model)
   return {
     mode: idleMs >= ttlMin * 60_000 ? 'cold' : 'warm',
     idle: fmtIdle(idleMs),
@@ -82,6 +84,21 @@ export const viewOf = (c: CacheFacts | null, now: number): CacheView | null => {
     window: c.window,
     mine: familyOf(c.model),
     ...(c.usd !== undefined ? { usd: c.usd } : {}),
+    ...(rate ? { rate } : {}),
+  }
+}
+
+// Claude Code's cache settings, read once when the session starts.
+let cacheEnv: CacheEnv = { force5m: false, ttl: '', enable1h: false }
+
+const loadEnv = async ($: EngineInterface): Promise<void> => {
+  // $.env.get wants a literal name, so each variable is spelled out.
+  const get = (read: () => Promise<string | undefined>) => read().then(v => (v ?? '').trim(), () => '')
+  const on = (v: string) => /^(1|true|yes|on)$/i.test(v)
+  cacheEnv = {
+    force5m: on(await get(() => $.env.get('FORCE_PROMPT_CACHING_5M'))),
+    ttl: await get(() => $.env.get('CLAUDE_CODE_PROMPT_CACHE_TTL')),
+    enable1h: on(await get(() => $.env.get('ENABLE_PROMPT_CACHING_1H'))),
   }
 }
 
@@ -160,6 +177,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     await pull($)
+    await loadEnv($)
     await seedFromTranscript($).catch(() => undefined)
     $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
     return next(e)
@@ -199,11 +217,24 @@ export const register: Register = (on, options) => {
 
   // Each main-thread request reads or writes the cache, so its start resets the hour.
   on('turn.step', async function* ($, e, next) {
-    if (!e.agentId) {
-      const now = await $.clock.now()
-      await update($, cache, c => ({ lastAt: now, tokens: c?.tokens ?? 0, window: c?.window ?? 0, model: c?.model ?? null, ...(c?.ttlMin ? { ttlMin: c.ttlMin } : {}) }))
+    if (e.agentId) return yield* next(e)
+    const now = await $.clock.now()
+    const prev = await read($, cache)
+    await update($, cache, c => ({ lastAt: now, tokens: c?.tokens ?? 0, window: c?.window ?? 0, model: c?.model ?? null, ...(c?.ttlMin ? { ttlMin: c.ttlMin } : {}) }))
+    const result = yield* next(e)
+    // The reply's token counts show how long the cache lives: learn it from the traffic.
+    const u = (result as { usage?: Record<string, unknown> } | undefined)?.usage
+    if (u && prev && prev.lastAt > 0) {
+      const model = String(u.model ?? (e as { model?: unknown }).model ?? '')
+      const learned = learnTtl(
+        now - prev.lastAt,
+        { read: Number(u.cache_read_input_tokens ?? 0), write: Number(u.cache_creation_input_tokens ?? 0), fresh: Number(u.input_tokens ?? 0) },
+        model !== '' && model === prev.model,
+        prev.tokens,
+      )
+      if (learned) await update($, cache, c => (c ? { ...c, ttlMin: learned } : c))
     }
-    yield* next(e)
+    return result
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -233,7 +264,7 @@ export const register: Register = (on, options) => {
       const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
       const saved = await read($, windows)
       const now = await $.clock.now()
-      const view = viewOf(await read($, cache), now)
+      const view = viewOf(await read($, cache), now, ruleTtl(cacheEnv, saved))
 
       if (saved.length === 0 && !view) {
         return (

@@ -265,3 +265,34 @@ test('usage: used shows the spent share, the filled dots and the context as used
   expect(await band.find({ text: ' 82% left' })).toBeUndefined()
   await band.unmount()
 })
+
+test('a session on an older model is priced at that model\'s rate, not the 5.5 row\'s', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-sonnet-4-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  // 770k tokens, the 1-hour write at 2 x $3 per million (Sonnet 5.5 would be $3.08).
+  expect(await band.find({ text: '$4.62' })).toBeDefined()
+  await band.unmount()
+})
+
+test('with no plan limits (an API key) the cache lives 5 minutes and prices the 1.25x write', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: 6 * 60, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: ' COLD ' })).toBeDefined()
+  expect(await band.find({ text: '$3.85' })).toBeDefined()
+  await band.unmount()
+})
+

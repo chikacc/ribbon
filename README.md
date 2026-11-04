@@ -94,6 +94,8 @@ The card shows how long you've been idle, how many tokens are in the cache, and 
 
 - **It costs nothing to run.** It reads the app's own numbers and draws them. It never calls a model.
 - **Prices are estimates.** They come from a price table in `hooks/cache-art.ts` (`MODELS`), not from your bill. If prices change, edit that table.
+- **Older models are priced as themselves.** The table in `hooks/cache-art.ts` has the 5.5 rows, and `OLDER` lists the rate of each older model by id (Sonnet 4.5, Opus 4.1, and so on).
+- **The cache length is worked out, not assumed.** 5 minutes or 1 hour: from Claude Code's cache settings (`FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`), then the plan (a subscription within its limits gets 1 hour, an API key 5 minutes), then what your own requests show.
 - **Subagents don't count.** Only your main chat resets the cache clock.
 
 ## What is inside
