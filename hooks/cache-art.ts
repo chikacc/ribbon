@@ -397,9 +397,9 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
   if (note && note.lines.length > 0) {
     g += hline(H)
     note.lines.forEach((line, i) => {
-      g += t(13, H + 24 + i * 18, line, i === 0 ? { size: 13, fill: note.color } : { size: 12, w: 500 })
+      g += t(13, H + 21 + i * 18, line, i === 0 ? { size: 13, fill: note.color } : { size: 12, w: 500 })
     })
-    H += 14 + note.lines.length * 18 + 8
+    H += 10 + note.lines.length * 18 + 4
   }
   const h = H + CARD_TOP
   const body = `<g transform="translate(0 ${CARD_TOP})">` + hline(0) + g + '</g>'

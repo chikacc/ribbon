@@ -489,8 +489,7 @@ export const register: Register = (on, options) => {
             color: o.out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
             lines: [
               `7-day limit runs out ${dayPart(o.out.at)}, around ${clockOf(o.out.at)}`,
-              `At this week's pace: ${Math.round(o.out.gained)}% used in ${fmtIdle(o.out.over)}`,
-              `It resets ${dateOf(o.out.resetMs)}, in ${fmtIdle(o.out.resetMs - now)}`,
+              `At this week's pace: ${Math.round(o.out.gained)}% in ${fmtIdle(o.out.over)} · resets ${dateOf(o.out.resetMs)}, in ${fmtIdle(o.out.resetMs - now)}`,
             ],
           }
         : undefined

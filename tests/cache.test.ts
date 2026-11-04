@@ -339,7 +339,7 @@ test('a 7-day limit set to run out early shows the warning in the row and the de
   await app.press({ key: 'cache-fold' })
   const card = await app.find({ key: 'card' })
   expect(JSON.stringify(card)).toContain('7-day limit runs out')
-  expect(JSON.stringify(card)).toContain('70% used in 4d 0h')
+  expect(JSON.stringify(card)).toContain('70% in 4d 0h')
   await app.unmount()
 
   const term = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
