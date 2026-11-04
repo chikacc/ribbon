@@ -296,3 +296,21 @@ test('with no plan limits (an API key) the cache lives 5 minutes and prices the 
   await band.unmount()
 })
 
+
+test('the windows are coloured by their pace, not by which window they are', async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  // 5H: 60% used with 4 of 5 hours left (20% of the time gone), far ahead. 7D: 10% used, half the week gone.
+  const rateLimits = [
+    { kind: 'five_hour', percentUsed: 60, resetsAt: new Date(NOW + 4 * 3_600_000).toISOString() },
+    { kind: 'seven_day', percentUsed: 10, resetsAt: new Date(NOW + 3.5 * 86_400_000).toISOString() },
+  ]
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits } }))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect((await band.find({ type: 'Text', text: ' 40% left' }))?.props.color).toBe('#d64545')
+  expect((await band.find({ type: 'Text', text: ' 90% left' }))?.props.color).toBe('#3a9a62')
+  await band.unmount()
+})

@@ -57,7 +57,8 @@ In a Claude Code terminal session, type:
 
 ### Usage left
 
-- **7D** (orange) is your 7-day window. **5H** (yellow) is your 5-hour window.
+- **7D** is your 7-day window. **5H** is your 5-hour window.
+- Their colour is how fast you are using them against the clock: **green** when you use no faster than time passes, **yellow** when you are ahead of it, **red** when you are more than 15 points ahead or past 90% used. A window that is 60% used with half its time gone is yellow, not green.
 - Each dot bar shows what is **left**, not what is used.
 - Under each one is when it resets, for example `resets 3d 9h`.
 - If a window drops under 15%, a bold **LOW** shows next to it.

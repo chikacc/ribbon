@@ -3,12 +3,13 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { CacheFacts, Fold, Window } from '../types'
 import {
-  HUE, INK, ORANGE, ROBO_SIZE, TTL_MIN, VIOLET, WORD, YELLOW,
+  HUE, INK, ROBO_SIZE, TONES, TTL_MIN, VIOLET, WORD,
   bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
 import { TAIL_BYTES, lastReply, learnTtl, ruleTtl, ttlFromTail } from './ttl'
 import type { CacheEnv } from './ttl'
+import { toneOf } from './pace'
 
 // A band above the prompt in a warm dark look: card surface, cream text,
 // dot-matrix bars. Shows how much of each usage window is LEFT, 7-day first, then
@@ -45,7 +46,6 @@ const fold = atom({ plugin: 'ribbon', key: 'fold' } as const, null as Fold | nul
 
 const NAMES: Record<string, string> = { seven_day: '7D', five_hour: '5H', spend_limit: 'SPEND', context: 'CTX' }
 const ORDER: Record<string, number> = { seven_day: 0, five_hour: 1 }
-const COLORS: Record<string, string> = { seven_day: ORANGE, five_hour: YELLOW, context: VIOLET }
 
 const clean = (list: readonly Window[]): Window[] =>
   list
@@ -291,13 +291,14 @@ export const register: Register = (on, options) => {
 
       const parts = (w: Window) => {
         const left = Math.max(0, Math.round((100 - w.percentUsed) * 10) / 10)
+        const tone = toneOf(w.kind, w.percentUsed, w.resetsAt, now)
         // The figure and the filled dots follow the setting; LOW always looks at what is left.
         const fig = used ? Math.min(100, Math.round(w.percentUsed * 10) / 10) : left
         return {
           left,
           fig,
           word: used ? 'used' : 'left',
-          col: COLORS[w.kind] ?? TEXT,
+          col: tone === 'calm' && w.kind === 'context' ? VIOLET : TONES[tone],
           name: NAMES[w.kind] ?? w.kind.toUpperCase(),
           d: dots(fig, cells),
           reset: w.note ?? fmtReset(w.resetsAt, now),

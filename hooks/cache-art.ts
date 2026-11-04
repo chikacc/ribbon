@@ -12,8 +12,8 @@ export const TEXT = '#e8e2d2'
 export const MUTED = '#8d8775'
 export const EMPTY = '#4a463b'
 export const LINE = '#36332b'
-export const ORANGE = '#ff6b1a'
-export const YELLOW = '#f5a623'
+// Both usage windows take the colour of their pace against the clock (see pace.ts).
+export const TONES: Record<'calm' | 'fast' | 'alert', string> = { calm: '#3a9a62', fast: '#e0b000', alert: '#d64545' }
 export const VIOLET = '#a98bd6'
 
 // The cache's two states in a muted shade: desaturated so they sit
