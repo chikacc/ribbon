@@ -347,3 +347,49 @@ test('a 7-day limit set to run out early shows the warning in the row and the de
   expect(await term.find({ type: 'Text', text: ' · 3d 0h' })).toBeDefined() // no card: the reset stays
   await term.unmount()
 })
+
+test('language: zh writes the band, the button and the card in Chinese', { options: { language: 'zh' } }, async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ text: '用量' })).toBeDefined()
+  expect(await band.find({ text: ' 剩余 82%' })).toBeDefined()
+  expect(await band.find({ text: '上下文 ' })).toBeDefined()
+  expect(await band.find({ text: ' 剩 42m' })).toBeDefined()
+  expect((await band.find({ key: 'cache-fold' }))?.props.label).toBe('展开')
+  expect(await band.find({ text: 'USAGE' })).toBeUndefined()
+  expect(await band.find({ text: ' left' })).toBeUndefined()
+  await band.press({ key: 'cache-fold' })
+  expect((await band.find({ key: 'cache-fold' }))?.props.label).toBe('收起')
+  expect(JSON.stringify(await band.find({ key: 'card' }))).toContain('缓存是热的')
+  await band.unmount()
+
+  const term = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await term.find({ text: ' 热 ' })).toBeDefined()
+  await term.unmount()
+})
+
+test('language: zh says the run-out in Chinese', { options: { language: 'zh' } }, async ($, on) => {
+  mock.store(on)
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('classic.SessionStart', () => ({}))
+  const rateLimits = [{ kind: 'seven_day', percentUsed: 70, resetsAt: new Date(NOW + 3 * 86_400_000).toISOString() }]
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits } }))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: WARM_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await band.find({ type: 'Text', text: '⚠' })).toBeDefined()
+  await band.press({ key: 'cache-fold' })
+  const card = JSON.stringify(await band.find({ key: 'card' }))
+  expect(card).toContain('7天额度将在')
+  expect(card).toContain('重置')
+  await band.unmount()
+})

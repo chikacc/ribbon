@@ -2,6 +2,8 @@
 // hands to Svg. Nothing here touches the engine.
 
 import { SANS } from './font'
+import { WORDS } from './lang'
+import type { Lang } from './lang'
 
 export type Mode = 'warm' | 'cold'
 export type Kind = 'wide' | 'stacked' | 'tight'
@@ -21,7 +23,6 @@ export const VIOLET = '#a98bd6'
 export const HUE: Record<Mode, string> = { warm: '#cc6363', cold: '#6aaabd' }
 /** Text on a filled chip. */
 export const INK = '#1c1a16'
-export const WORD: Record<Mode, string> = { warm: 'WARM', cold: 'COLD' }
 
 /**
  * The prompt cache lives 5 minutes or an hour after the last request that read or wrote it,
@@ -133,6 +134,8 @@ export type CacheView = {
   mine: string | null
   /** The session's own rate when it is on an older model than its MODELS row. */
   rate?: Rate
+  /** The language the drawings speak. */
+  lang?: Lang
   /** Claude Code's own re-cache estimate after a resume; it wins over the table for this session's model. */
   usd?: number
 }
@@ -176,6 +179,11 @@ const CHIP: Record<string, { w: number; h: number }> = {
   'WARM@11': { w: 54, h: 18 },
   'COLD@11': { w: 50, h: 18 },
   'YOU@10': { w: 36, h: 17 },
+  '热@13': { w: 40, h: 21 },
+  '冷@13': { w: 40, h: 21 },
+  '热@11': { w: 34, h: 18 },
+  '冷@11': { w: 34, h: 18 },
+  '当前@10': { w: 38, h: 17 },
 }
 
 export const chipShapes = (x: number, y: number, word: string, fill: string, size: number, ls: number): { w: number; h: number; svg: string } => {
@@ -191,8 +199,8 @@ export const chipShapes = (x: number, y: number, word: string, fill: string, siz
 }
 
 /** The WARM or COLD chip beside Robo in the band's row. */
-export const chipSvg = (mode: Mode): { source: string; w: number; h: number } => {
-  const c = chipShapes(0, 0, WORD[mode], HUE[mode], 13, 1)
+export const chipSvg = (mode: Mode, lang: Lang = 'en'): { source: string; w: number; h: number } => {
+  const c = chipShapes(0, 0, WORDS[lang][mode], HUE[mode], 13, 1)
   return { source: svgDoc(c.w, c.h, c.svg, true), w: c.w, h: c.h }
 }
 
@@ -281,6 +289,7 @@ export type CardNote = { color: string; lines: string[] }
 
 export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): { source: string; w: number; h: number; alt: string } => {
   const mode = v.mode
+  const L = WORDS[v.lang ?? 'en']
   const cold = mode === 'cold'
   const HUEM = HUE[mode]
   const FIRE = HUE.warm
@@ -297,10 +306,10 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
     let g = ''
     if (o.header) {
       g += roboShapes(x - 2, y + k.lab - 17, 22, mode)
-      const c = chipShapes(x + 26, y + k.lab - 13, WORD[mode], HUEM, 11, 1)
-      g += c.svg + t(x + 26 + c.w + 8, y + k.lab, 'IDLE', { ls: 1.4 })
+      const c = chipShapes(x + 26, y + k.lab - 13, L[mode], HUEM, 11, 1)
+      g += c.svg + t(x + 26 + c.w + 8, y + k.lab, L.idle, { ls: 1.4 })
     } else {
-      g += t(x, y + k.lab, 'IDLE', { ls: 1.4 })
+      g += t(x, y + k.lab, L.idle, { ls: 1.4 })
     }
     g += t(x, y + k.big, v.idle, { size: k.bs, w: 600, fill: TEXT })
     const ly = y + k.line
@@ -310,15 +319,15 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
       g += `<line x1="${x0}" y1="${ly}" x2="${x0 + 18}" y2="${ly}" stroke="${FIRE}" stroke-width="5" stroke-linecap="round"/>`
       for (let cx = x0 + 30; cx <= x1 - 14; cx += 9) g += `<circle cx="${cx}" cy="${ly}" r="2.2" fill="${ICE}"/>`
       g += `<circle cx="${x1}" cy="${ly}" r="5.5" fill="${ICE}"/>`
-      g += t(x, y + k.cap, `warm ${v.ttlMin >= 60 ? '1h' : `${v.ttlMin}m`}`, { size: 12, w: 600, fill: FIRE })
-      g += t(x1 + 5, y + k.cap, 'cold now', { size: 12, w: 600, fill: ICE, anchor: 'end' })
+      g += t(x, y + k.cap, L.warmFor(v.ttlMin >= 60 ? '1h' : `${v.ttlMin}m`), { size: 12, w: 600, fill: FIRE })
+      g += t(x1 + 5, y + k.cap, L.coldNow, { size: 12, w: 600, fill: ICE, anchor: 'end' })
     } else {
       const now = x0 + (x1 - x0) * Math.min(1, v.idleMin / v.ttlMin)
       g += `<line x1="${x0}" y1="${ly}" x2="${now}" y2="${ly}" stroke="${FIRE}" stroke-width="5" stroke-linecap="round"/>`
       for (let cx = now + 12; cx <= x1 - 12; cx += 9) g += `<circle cx="${cx}" cy="${ly}" r="2.2" fill="${EMPTY}"/>`
       g += `<circle cx="${x1}" cy="${ly}" r="4.5" fill="none" stroke="${ICE}" stroke-width="2"/>`
-      g += t(x, y + k.cap, 'last reply', { size: 12, w: 500 })
-      g += t(x1 + 5, y + k.cap, `cold in ${Math.max(0, v.ttlMin - v.idleMin)}m`, { size: 12, w: 600, fill: ICE, anchor: 'end' })
+      g += t(x, y + k.cap, L.lastReply, { size: 12, w: 500 })
+      g += t(x1 + 5, y + k.cap, L.coldIn(Math.max(0, v.ttlMin - v.idleMin)), { size: 12, w: 600, fill: ICE, anchor: 'end' })
     }
     return g
   }
@@ -326,7 +335,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
   // The conversation's size, as a dot grid of the context window.
   const zoneSize = (x: number, y: number, w: number, o: { compact?: boolean } = {}) => {
     const share = v.window > 0 ? Math.min(1, v.tokens / v.window) : 0
-    let g = t(x, y + (o.compact ? 24 : 30), cold ? 'RE-CACHE' : 'IN CACHE', { ls: 1.4 })
+    let g = t(x, y + (o.compact ? 24 : 30), cold ? L.reCache : L.inCache, { ls: 1.4 })
     const big = (yy: number, bs: number, ts: number) =>
       `<text x="${x}" y="${yy}" font-weight="600" fill="${TEXT}"><tspan font-size="${bs}">${tok(v.tokens)}</tspan><tspan font-size="${ts}" font-weight="500" fill="${MUTED}" dx="7">tokens</tspan></text>`
     const grid = (gx: number, gy: number, cols: number, step: number) => {
@@ -343,7 +352,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
     }
     // 25 dots a row on the page; fewer only where the band is too narrow for them.
     const cols = Math.max(10, Math.min(25, Math.floor(w / 9.6)))
-    return g + big(y + 72, 38, 15) + grid(x, y + 90, cols, 9.6) + t(x, y + 120, `${Math.round(share * 100)}% of the ${tok(v.window)} context`, { size: 12, w: 500 })
+    return g + big(y + 72, 38, 15) + grid(x, y + 90, cols, 9.6) + t(x, y + 120, L.ofContext(Math.round(share * 100), tok(v.window)), { size: 12, w: 500 })
   }
 
   // What the next message costs, by model. One scale for both states (the cold
@@ -352,7 +361,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
     const k = o.compact
       ? { lab: 24, base: 100, rows: 6, step: 7, chip: 58, price: 88, name: 102 }
       : { lab: 30, base: 116, rows: 8, step: 8, chip: 70, price: 104, name: 120 }
-    let g = t(x, y + k.lab, cold ? 'NEXT MESSAGE COSTS' : 'NEXT MESSAGE COSTS, CACHED', { ls: 1.4 })
+    let g = t(x, y + k.lab, L.nextCosts(cold), { ls: 1.4 })
     const top = Math.max(...MODELS.map(m => coldCost(rowFor(v, m), v.tokens, v.ttlMin)))
     MODELS.forEach((m, i) => {
       const mine = m.id === v.mine
@@ -361,7 +370,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
       for (let r = 0; r < k.rows; r++)
         for (let c = 0; c < 3; c++)
           g += `<circle cx="${bx + 3 + c * 8}" cy="${y + k.base - r * k.step}" r="2.8" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
-      if (mine) g += chipShapes(bx + 30, y + k.chip, 'YOU', HUEM, 10, 0.8).svg
+      if (mine) g += chipShapes(bx + 30, y + k.chip, L.you, HUEM, 10, 0.8).svg
       g += t(bx + 30, y + k.price, usd(priceOf(v, m)), { size: 17, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
       g += t(bx + 30, y + k.name, m.NAME, { size: 11, w: 700, fill: mine ? HUEM : MUTED, ls: 0.8 })
     })
@@ -404,7 +413,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): {
   const h = H + CARD_TOP
   const body = `<g transform="translate(0 ${CARD_TOP})">` + hline(0) + g + '</g>'
   const alt = cold
-    ? `Cache cold. Idle ${v.idle}. Next message re-caches ${tok(v.tokens)} tokens.`
-    : `Cache warm. Goes cold in ${Math.max(0, v.ttlMin - v.idleMin)} minutes. ${tok(v.tokens)} tokens cached.`
+    ? L.altCold(v.idle, tok(v.tokens))
+    : L.altWarm(Math.max(0, v.ttlMin - v.idleMin), tok(v.tokens))
   return { source: svgDoc(W, h, body, true), w: W, h, alt }
 }

@@ -1,4 +1,7 @@
 // How fast a limit is being used against the clock. Pure: no engine, no drawing.
+import { WORDS } from './lang'
+import type { Lang } from './lang'
+
 export type Tone = 'calm' | 'fast' | 'alert'
 
 /** The window lengths, which a reset time turns into "how much of the time has gone". */
@@ -46,23 +49,22 @@ export const runOutOf = (kind: string, percentUsed: number, resetsAt: string | u
 /** Within a day of running out the warning turns red. */
 export const OUT_ALERT = DAY
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const two = (n: number) => String(n).padStart(2, '0')
 
 /** "Sun night", "Fri evening"; short: "Sun pm". The hours after midnight belong to the night before. */
-export const dayPart = (ms: number, short = false): string => {
+export const dayPart = (ms: number, short = false, lang: Lang = 'en'): string => {
+  const w = WORDS[lang]
   const d = new Date(ms)
   const h = d.getHours()
-  if (h < 6) return `${DAYS[(d.getDay() + 6) % 7]} ${short ? 'pm' : 'night'}`
-  const part = h < 12 ? ['am', 'morning'] : h < 18 ? ['pm', 'afternoon'] : ['pm', 'evening']
-  return `${DAYS[d.getDay()]} ${short ? part[0] : part[1]}`
+  const part = h < 6 ? 'night' : h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening'
+  return w.dayPart(w.days[d.getDay()]!, w.days[(d.getDay() + 6) % 7]!, part, short)
 }
 
 export const clockOf = (ms: number): string => `${two(new Date(ms).getHours())}:${two(new Date(ms).getMinutes())}`
 
 /** "Mon 19 Oct". */
-export const dateOf = (ms: number): string => {
+export const dateOf = (ms: number, lang: Lang = 'en'): string => {
+  const w = WORDS[lang]
   const d = new Date(ms)
-  return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`
+  return w.date(w.days[d.getDay()]!, d.getDate(), d.getMonth() + 1)
 }

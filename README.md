@@ -72,6 +72,7 @@ In a Claude Code terminal session, type:
 Open `/config` and find **ribbon**, or run `claude plugin configure ribbon@robonuggets`.
 
 - **Usage figure:** `left` (default) shows how much of each window and of the context is left. `used` shows how much is spent, and the dots fill with it. LOW still means under 15% left.
+- **Language:** `en` (default) or `zh`. `zh` writes the band, the Show button and the cache card in Chinese. Durations (`3d 9h`, `42m`) and model names stay as they are in both.
 
 ### The prompt cache
 

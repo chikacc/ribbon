@@ -20,7 +20,7 @@ test('with no reset time or no known length only the 90% rule applies', () => {
   expect(toneOf('five_hour', 80, in5h(9), NOW)).toBe('calm') // reset further off than the window is long: bad data
 })
 
-import { dayPart, runOutOf } from '../hooks/pace'
+import { dateOf, dayPart, runOutOf } from '../hooks/pace'
 
 test('the 7-day limit runs out early only when the week\'s pace says so', () => {
   const day = 86_400_000
@@ -43,4 +43,13 @@ test('a time of day is a day and a part of it; the small hours belong to the nig
   expect(dayPart(at('2026-10-19T00:42:00'))).toBe('Sun night')
   expect(dayPart(at('2026-10-19T00:42:00'), true)).toBe('Sun pm')
   expect(dayPart(at('2026-10-19T09:00:00'))).toBe('Mon morning')
+})
+
+test('days and dates in Chinese', () => {
+  const at = (iso: string) => new Date(iso).getTime()
+  expect(dayPart(at('2026-10-19T00:42:00'), false, 'zh')).toBe('周日夜里')
+  expect(dayPart(at('2026-10-18T22:00:00'), false, 'zh')).toBe('周日晚上')
+  expect(dayPart(at('2026-10-18T22:00:00'), true, 'zh')).toBe('周日下午')
+  expect(dateOf(at('2026-10-19T09:00:00'), 'zh')).toBe('10月19日 周一')
+  expect(dateOf(at('2026-10-19T09:00:00'))).toBe('Mon 19 Oct')
 })

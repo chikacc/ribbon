@@ -3,12 +3,14 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { CacheFacts, Fold, Window } from '../types'
 import {
-  HUE, INK, ROBO_SIZE, TONES, TTL_MIN, VIOLET, WORD,
+  HUE, INK, ROBO_SIZE, TONES, TTL_MIN, VIOLET,
   bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
+import type { Lang } from './lang'
 import { TAIL_BYTES, lastReply, learnTtl, ruleTtl, ttlFromTail } from './ttl'
 import type { CacheEnv } from './ttl'
+import { WORDS, langOf } from './lang'
 import { OUT_ALERT, clockOf, dateOf, dayPart, runOutOf, toneOf } from './pace'
 
 // A band above the prompt in a warm dark look: card surface, cream text,
@@ -57,11 +59,11 @@ const dots = (left: number, cells: number): { on: string; off: string } => {
   return { on: '●'.repeat(n), off: '·'.repeat(cells - n) }
 }
 
-const fmtReset = (iso: string | undefined, now: number): string => {
+const fmtReset = (iso: string | undefined, now: number, resetting = 'resetting'): string => {
   if (!iso) return ''
   const ms = Date.parse(iso) - now
   if (Number.isNaN(ms)) return ''
-  if (ms <= 0) return 'resetting'
+  if (ms <= 0) return resetting
   const mins = Math.round(ms / 60000)
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
@@ -70,7 +72,7 @@ const fmtReset = (iso: string | undefined, now: number): string => {
 }
 
 /** What the cache drawings read, or null until a request and its context size are known. */
-export const viewOf = (c: CacheFacts | null, now: number, fallbackMin = TTL_MIN): CacheView | null => {
+export const viewOf = (c: CacheFacts | null, now: number, fallbackMin = TTL_MIN, lang: Lang = 'en'): CacheView | null => {
   if (!c || c.lastAt <= 0 || c.tokens <= 0) return null
   const idleMs = Math.max(0, now - c.lastAt)
   const ttlMin = c.ttlMin ?? fallbackMin
@@ -85,6 +87,7 @@ export const viewOf = (c: CacheFacts | null, now: number, fallbackMin = TTL_MIN)
     mine: familyOf(c.model),
     ...(c.usd !== undefined ? { usd: c.usd } : {}),
     ...(rate ? { rate } : {}),
+    lang,
   }
 }
 
@@ -174,6 +177,9 @@ const measure = async ($: EngineInterface, lastAt: number | null, model: string 
 export const register: Register = (on, options) => {
   // userConfig `usage`: whether the bars show what is left (default) or what is used.
   const used = options.usage === 'used'
+  // userConfig `language`: en (default) or zh.
+  const lang = langOf(options.language)
+  const T = WORDS[lang]
 
   on('session.start', async ($, e, next) => {
     await pull($)
@@ -264,12 +270,12 @@ export const register: Register = (on, options) => {
       const Svg = e.surface !== 'terminal' && 'Svg' in ui ? ui.Svg : null
       const saved = await read($, windows)
       const now = await $.clock.now()
-      const view = viewOf(await read($, cache), now, ruleTtl(cacheEnv, saved))
+      const view = viewOf(await read($, cache), now, ruleTtl(cacheEnv, saved), lang)
 
       if (saved.length === 0 && !view) {
         return (
           <Box paddingX={1}>
-            <Text color={MUTED}>USAGE · waiting for the first reply</Text>
+            <Text color={MUTED}>{`${T.usage} · ${T.waiting}`}</Text>
           </Box>
         )
       }
@@ -298,11 +304,11 @@ export const register: Register = (on, options) => {
         return {
           left,
           fig,
-          word: used ? 'used' : 'left',
+          text: T.figure(fig, used),
           col: tone === 'calm' && w.kind === 'context' ? VIOLET : TONES[tone],
-          name: NAMES[w.kind] ?? w.kind.toUpperCase(),
+          name: w.kind === 'context' ? T.ctx : (NAMES[w.kind] ?? w.kind.toUpperCase()),
           d: dots(fig, cells),
-          reset: w.note ?? fmtReset(w.resetsAt, now),
+          reset: w.note ?? fmtReset(w.resetsAt, now, T.resetting),
           out,
           outCol: out && out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
         }
@@ -313,7 +319,7 @@ export const register: Register = (on, options) => {
       // the rest; otherwise it adds to the row.
       const detail = Svg !== null && !!view
       const warning = (p: ReturnType<typeof parts>, form: 'long' | 'short') =>
-        p.out ? <Text color={p.outCol} bold>{form === 'long' ? ' · ' : ' '}⚠ {dayPart(p.out.at, form === 'short')}</Text> : null
+        p.out ? <Text color={p.outCol} bold>{form === 'long' ? ' · ' : ' '}⚠ {dayPart(p.out.at, form === 'short', lang)}</Text> : null
 
       // Wide: every window on one row. Narrow: each window is a block of three
       // lines (name and dots, percent left, reset time) so nothing wraps or clips.
@@ -324,8 +330,8 @@ export const register: Register = (on, options) => {
             <Text color={MUTED} bold>{p.name} </Text>
             <Text color={p.col}>{p.d.on}</Text>
             <Text color={EMPTY}>{p.d.off}</Text>
-            <Text color={p.col} bold> {p.fig}% {p.word}</Text>
-            {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
+            <Text color={p.col} bold>{` ${p.text}`}</Text>
+            {p.left < LOW_AT ? <Text color={TEXT} bold>{` ${T.low}`}</Text> : null}
             {p.reset && !(p.out && detail) ? <Text color={MUTED}> · {p.reset}</Text> : null}
             {warning(p, 'long')}
           </Box>
@@ -341,7 +347,7 @@ export const register: Register = (on, options) => {
             <Text color={p.col}>{p.d.on}</Text>
             <Text color={EMPTY}>{p.d.off}</Text>
             <Text color={p.col} bold> {Math.round(p.fig)}%</Text>
-            {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
+            {p.left < LOW_AT ? <Text color={TEXT} bold>{` ${T.low}`}</Text> : null}
             {p.reset && !(p.out && detail) ? <Text color={MUTED}> {p.reset.replace(' ', '')}</Text> : null}
             {Svg ? warning(p, 'short') : null}
           </Box>
@@ -358,22 +364,22 @@ export const register: Register = (on, options) => {
               <Text color={EMPTY}>{p.d.off}</Text>
             </Box>
             <Box flexDirection="row">
-              <Text color={p.col} bold>{p.fig}% {p.word}</Text>
-              {p.left < LOW_AT ? <Text color={TEXT} bold> LOW</Text> : null}
+              <Text color={p.col} bold>{p.text}</Text>
+              {p.left < LOW_AT ? <Text color={TEXT} bold>{` ${T.low}`}</Text> : null}
             </Box>
-            {p.out && detail ? <Text color={p.outCol} bold>⚠ {dayPart(p.out.at, true)}</Text> : p.reset ? <Text color={MUTED}>resets {p.reset}</Text> : null}
+            {p.out && detail ? <Text color={p.outCol} bold>⚠ {dayPart(p.out.at, true, lang)}</Text> : p.reset ? <Text color={MUTED}>{T.resetsLine(p.reset)}</Text> : null}
           </Box>
         )
       }
 
       const label = compact ? null : (
         <Box key="label" flexShrink={0} marginRight={isWide ? 2 : 3}>
-          <Text color={TEXT} bold>USAGE</Text>
+          <Text color={TEXT} bold>{T.usage}</Text>
         </Box>
       )
       const usage = list.length > 0
         ? list.map(compact ? short : isWide ? wide : stacked)
-        : [<Box key="wait" flexShrink={0} marginRight={3}><Text color={MUTED}>waiting for the first reply</Text></Box>]
+        : [<Box key="wait" flexShrink={0} marginRight={3}><Text color={MUTED}>{T.waiting}</Text></Box>]
 
       // Before the first reply there is no cache to show: today's band, as it was.
       if (!view) {
@@ -397,14 +403,14 @@ export const register: Register = (on, options) => {
 
       const badge = Svg
         ? [
-            <Svg key="robo" source={roboSvg(mode)} alt={cold ? 'Robo, frozen' : 'Robo, bobbing'} width={ROBO_SIZE} height={ROBO_SIZE} isInteractive />,
+            <Svg key="robo" source={roboSvg(mode)} alt={cold ? T.roboCold : T.roboWarm} width={ROBO_SIZE} height={ROBO_SIZE} isInteractive />,
             <Text key="gap"> </Text>,
             (() => {
-              const c = chipSvg(mode)
-              return <Svg key="chip" source={c.source} alt={WORD[mode]} width={c.w} height={c.h} />
+              const c = chipSvg(mode, lang)
+              return <Svg key="chip" source={c.source} alt={T[mode]} width={c.w} height={c.h} />
             })(),
           ]
-        : [<Text key="chip" backgroundColor={hue} color={INK} bold>{` ${WORD[mode]} `}</Text>]
+        : [<Text key="chip" backgroundColor={hue} color={INK} bold>{` ${T[mode]} `}</Text>]
 
       const summary = compact
         ? cold
@@ -418,11 +424,11 @@ export const register: Register = (on, options) => {
             mine ? <Text key="dot" color={MUTED}> · </Text> : null,
             mine ? <Text key="cost" color={TEXT} bold>{usd(priceOf(view, mine))}</Text> : null,
           ]
-        : [<Text key="left" color={hue} bold>{` ${Math.max(0, view.ttlMin - view.idleMin)}m left`}</Text>]
+        : [<Text key="left" color={hue} bold>{` ${T.leftMin(Math.max(0, view.ttlMin - view.idleMin))}`}</Text>]
 
       const button = Svg ? (
         <Box key="fold" flexShrink={0} alignItems="flex-start">
-          <Button key="cache-fold" label={open ? 'Hide' : 'Show'} onPress={toggle} />
+          <Button key="cache-fold" label={open ? T.hide : T.show} onPress={toggle} />
         </Box>
       ) : null
       const grow = <Box key="grow" flexGrow={1} />
@@ -452,11 +458,11 @@ export const register: Register = (on, options) => {
             {open ? null : (
               <Box key="block" flexDirection="column" flexShrink={0} marginRight={2}>
                 <Box flexDirection="row" alignItems="center">{badge}</Box>
-                <Text color={hue} bold>{cold ? `${view.idle} idle` : `${Math.max(0, view.ttlMin - view.idleMin)}m left`}</Text>
+                <Text color={hue} bold>{cold ? T.idleFor(view.idle) : T.leftMin(Math.max(0, view.ttlMin - view.idleMin))}</Text>
                 {mine ? (
                   <Box flexDirection="row">
                     <Text color={TEXT} bold>{usd(priceOf(view, mine))}</Text>
-                    <Text color={MUTED}> next</Text>
+                    <Text color={MUTED}>{` ${T.next}`}</Text>
                   </Box>
                 ) : null}
               </Box>
@@ -488,8 +494,8 @@ export const register: Register = (on, options) => {
         ? {
             color: o.out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
             lines: [
-              `7-day limit runs out ${dayPart(o.out.at)}, around ${clockOf(o.out.at)}`,
-              `At this week's pace: ${Math.round(o.out.gained)}% in ${fmtIdle(o.out.over)} · resets ${dateOf(o.out.resetMs)}, in ${fmtIdle(o.out.resetMs - now)}`,
+              T.runsOut(dayPart(o.out.at, false, lang), clockOf(o.out.at)),
+              T.pace(Math.round(o.out.gained), fmtIdle(o.out.over), dateOf(o.out.resetMs, lang), fmtIdle(o.out.resetMs - now)),
             ],
           }
         : undefined
