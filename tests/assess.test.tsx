@@ -229,3 +229,16 @@ test('off the one-row layouts the assess button takes a row of its own, so Show 
     await narrow.unmount()
   }
 })
+
+test('the context gauge shows at every width, so its colour and the assess button go together', async ($, on) => {
+  mock.clock(on, { now: STARTED_AT })
+  answerSession(on, 600_000)
+  await resume($, 600_000)
+
+  for (const bodyColumns of [150, 80, 53, 33]) {
+    const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
+    expect(await ui.find({ type: 'Text', text: /^CTX ?$/ }), `CTX at ${bodyColumns} columns`).toBeDefined()
+    expect(await ui.find({ key: 'assess' })).toBeDefined()
+    await ui.unmount()
+  }
+})

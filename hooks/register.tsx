@@ -42,9 +42,8 @@ const FULL_AT = 106
 /** From here up to FULL_AT the band stays one row, in short words: no label, "94% 2d5h". */
 const COMPACT_AT = 66
 const COMPACT_CELLS = 5
-/** Extra columns the CTX gauge costs on the full row, and on the compact one. */
+/** Extra columns the CTX gauge costs on the full row: past them the row keeps its long words. */
 const CTX_FULL = 36
-const CTX_COMPACT = 20
 /** How often the band redraws, so the countdown and the warm-to-cold flip stay current. */
 const TICK_MS = 30_000
 
@@ -395,8 +394,10 @@ export const register: Register = (on, options) => {
       const compact = columns >= COMPACT_AT && columns < fullAt
       const isWide = kind === 'wide' || compact
       const cells = compact ? COMPACT_CELLS : kind === 'tight' ? TIGHT_CELLS : CELLS
+      // The context gauge shows at every width: it is what the assess button weighs. The rows wrap,
+      // so where it does not fit beside the windows it moves to the next line, whole.
       const ctx: Window[] =
-        view && hasCtx && (columns >= fullAt || columns >= COMPACT_AT + CTX_COMPACT)
+        view && hasCtx
           ? [{ kind: 'context', percentUsed: Math.min(100, (view.tokens / view.window) * 100), note: compact ? tok(view.tokens) : `${tok(view.tokens)}/${tok(view.window)}` }]
           : []
       const list = [...saved, ...ctx]
@@ -490,7 +491,7 @@ export const register: Register = (on, options) => {
       // Before the first reply there is no cache to show: today's band, as it was.
       if (!view) {
         return (
-          <Box flexDirection="row" paddingX={1}>
+          <Box flexDirection="row" flexWrap="wrap" paddingX={1}>
             {label}
             {usage}
             {compacted}
@@ -546,7 +547,7 @@ export const register: Register = (on, options) => {
       let rows
       if (isWide) {
         rows = (
-          <Box key="row" flexDirection="row" paddingX={1} alignItems="center">
+          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1} alignItems="center">
             {label}
             {usage}
             {open ? null : (
@@ -564,7 +565,7 @@ export const register: Register = (on, options) => {
       } else if (kind === 'stacked') {
         // The cache becomes a third stacked block, the same shape as 7D and 5H.
         rows = (
-          <Box key="row" flexDirection="row" paddingX={1}>
+          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1}>
             {label}
             {usage}
             {open ? null : (
@@ -587,11 +588,11 @@ export const register: Register = (on, options) => {
       } else {
         // Narrow: the cache gets its own row under the usage blocks.
         rows = [
-          <Box key="row" flexDirection="row" paddingX={1}>
+          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1}>
             {label}
             {usage}
           </Box>,
-          <Box key="cache" flexDirection="row" paddingX={1} alignItems="center">
+          <Box key="cache" flexDirection="row" flexWrap="wrap" paddingX={1} alignItems="center">
             {badge}
             {summary}
             {compacted}

@@ -74,7 +74,7 @@ In a Claude Code terminal session, type:
 - If a window drops under 15%, a bold **LOW** shows next to it.
 
 - **Run-out warning.** When this week's pace would use up the 7-day limit before it resets, 7D shows `⚠ Sun night` (when it runs out) in place of the reset countdown: yellow, red within a day. Click **Show** in the app for the numbers and the reset time. It needs a day of the week gone and 15% used. Where there is no card to show them (the terminal, or before the first reply) the warning is added to the row and the reset stays.
-- **CTX** is how much of the context window is left, coloured blue, yellow or red by how close it is to auto-compaction (see above), with the token count (`770k/1M`), shown after the first reply when the row has room.
+- **CTX** is how much of the context window is left, coloured blue, yellow or red by how close it is to auto-compaction (see above), with the token count (`770k/1M`), shown after the first reply at every width: where the row has no room for it, the row wraps and it moves to the next line.
 - The band has no background of its own: it follows the app's light or dark theme.
 
 ### Settings

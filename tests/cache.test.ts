@@ -206,8 +206,9 @@ test('between the compact and full widths the band stays one row, in short words
     expect(await band.find({ text: '3h29m' })).toBeDefined()
     expect(await band.find({ text: '42m' })).toBeDefined()
     expect((await band.find({ key: 'cache-fold' }))?.props.label).toBe('Show')
-    // The context gauge (770k of 1M used) needs room for its extra bar: it joins at 90 columns, not 70.
-    expect(await band.find({ text: ' 23%' }) !== undefined).toBe(bodyColumns === 90)
+    // The context gauge (770k of 1M used) shows at both widths; the row wraps where it does not fit.
+    expect(await band.find({ text: ' 23%' })).toBeDefined()
+    expect((await band.find({ key: 'row' }))?.props.flexWrap).toBe('wrap')
     await band.unmount()
   }
 })
