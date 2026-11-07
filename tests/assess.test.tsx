@@ -254,7 +254,7 @@ test('the rows part by a small step, so the assess row does not touch the Show /
   await ui.unmount()
 })
 
-test('off the one-row layouts the blocks wrap beside the label, a small step apart, so a wrapped block lines up under 7D', async ($, on) => {
+test('off the one-row layouts the blocks wrap with no label, a small step apart, so a wrapped block lines up under 7D', async ($, on) => {
   mock.clock(on, { now: STARTED_AT })
   answerSession(on, 400_000)
   await resume($, 400_000)
@@ -267,10 +267,27 @@ test('off the one-row layouts the blocks wrap beside the label, a small step apa
     expect(blocks?.props.flexWrap).toBe('wrap')
     expect(blocks?.props.rowGap).toBe('xs')
     expect(blocks?.text, `CTX in the group at ${bodyColumns} columns`).toMatch(/CTX/)
+    expect(await ui.find({ key: 'label' }), `no label at ${bodyColumns} columns`).toBeUndefined()
     await ui.unmount()
   }
 
   const wide = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect((await wide.find({ key: 'row' }))?.props.rowGap).toBe('xs')
   await wide.unmount()
+})
+
+test('empty cells are dim full dots where the font is proportional, and middle dots in the terminal', async ($, on) => {
+  mock.clock(on, { now: STARTED_AT })
+  answerSession(on, 400_000)
+  await resume($, 400_000)
+
+  const app = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const full = await app.findAll({ type: 'Text', text: /^●+$/ })
+  expect(full.some(el => el.props.color === 'subtle')).toBe(true)
+  expect(await app.find({ type: 'Text', text: /^·+$/ })).toBeUndefined()
+  await app.unmount()
+
+  const term = await $.ui.mount({ plugin: 'ribbon', surface: 'terminal', component: 'AbovePrompt', props: PROPS })
+  expect(await term.find({ type: 'Text', text: /^·+$/ })).toBeDefined()
+  await term.unmount()
 })

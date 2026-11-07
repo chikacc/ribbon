@@ -63,9 +63,14 @@ const clean = (list: readonly Window[]): Window[] =>
     .map(w => ({ kind: w.kind, percentUsed: w.percentUsed, resetsAt: w.resetsAt }))
     .sort((a, b) => (ORDER[a.kind] ?? 9) - (ORDER[b.kind] ?? 9))
 
-const dots = (left: number, cells: number): { on: string; off: string } => {
+/** Empty cells: a dim full dot where the font is proportional, so each cell keeps the filled one's width. */
+const OFF_GRAPHIC = '●'
+/** Empty cells in the terminal, upstream's; in a proportional font three of them read as an ellipsis. */
+const OFF_TERMINAL = '·'
+
+const dots = (left: number, cells: number, offGlyph = OFF_TERMINAL): { on: string; off: string } => {
   const n = Math.max(0, Math.min(cells, Math.round((left / 100) * cells)))
-  return { on: '●'.repeat(n), off: '·'.repeat(cells - n) }
+  return { on: '●'.repeat(n), off: offGlyph.repeat(cells - n) }
 }
 
 const fmtReset = (iso: string | undefined, now: number, resetting = 'resetting'): string => {
@@ -414,7 +419,7 @@ export const register: Register = (on, options) => {
           text: T.figure(fig, used),
           col: w.kind === 'context' ? ZONE_TONES[zone] : TONES[tone],
           name: w.kind === 'context' ? T.ctx : (NAMES[w.kind] ?? w.kind.toUpperCase()),
-          d: dots(fig, cells),
+          d: dots(fig, cells, Svg !== null ? OFF_GRAPHIC : OFF_TERMINAL),
           reset: w.note ?? fmtReset(w.resetsAt, now, T.resetting),
           out,
           outCol: out && out.left <= OUT_ALERT ? TONES.alert : TONES.fast,
@@ -479,8 +484,10 @@ export const register: Register = (on, options) => {
         )
       }
 
-      const label = compact ? null : (
-        <Box key="label" flexShrink={0} marginRight={isWide ? 2 : 3}>
+      // Only the full one row names the band: the short row and the blocks name each window already,
+      // and off the one-row layouts the label's column is room the blocks need.
+      const label = compact || !isWide ? null : (
+        <Box key="label" flexShrink={0} marginRight={2}>
           <Text color={TEXT} bold>{T.usage}</Text>
         </Box>
       )
