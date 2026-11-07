@@ -101,6 +101,7 @@ The card shows how long you've been idle, how many tokens are in the cache, and 
 - **Medium:** still one row, in short words: no label, `94% 2d5h`, and the cache as `WARM 60m` or the price.
 - **Half width:** each window stacks into a small block.
 - **Narrow:** the cache moves to its own row.
+- **The card:** its three parts (idle, in cache, next message) are drawings of their own size. They sit side by side where they fit and wrap below where they do not, so their text is never shrunk to fit.
 - **Terminal:** the same facts as plain text.
 
 ## Good to know

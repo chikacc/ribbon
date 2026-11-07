@@ -40,13 +40,6 @@ export const TIGHT_AT = 42
 
 export const kindOf = (columns: number): Kind => (columns >= WIDE_AT ? 'wide' : columns >= TIGHT_AT ? 'stacked' : 'tight')
 
-/**
- * The band's width in CSS pixels for a column count: the engine keeps 5 cells
- * for its [-], and a cell is 12 px (the app's code font advance). Rounds down,
- * so the card never runs past the slot; the few pixels left are band colour.
- */
-export const bandPx = (columns: number): number => (columns + 5) * 12
-
 // $ per million tokens: input, and the cache read. A cache write is 2 times input for
 // the 1-hour cache and 1.25 times for the 5-minute one. Haiku 5.5 is $0.10 up to 100K
 // tokens and $0.50 above, so it carries a `short` rate for prompts up to that size.
@@ -284,22 +277,38 @@ export const roboShapes = (x: number, y: number, size: number, mode: Mode): stri
 export const ROBO_SIZE = 26
 export const roboSvg = (mode: Mode): string => svgDoc(ROBO_SIZE, ROBO_SIZE, roboShapes(0, 0, ROBO_SIZE, mode), false)
 
-// ---------- The card, laid out for the band's width ----------
+// ---------- The card: three tiles the band lays out ----------
+// The card is three drawings of their own size (how long idle, how much is cached, what the next
+// message costs) in a Box that wraps. The surface puts them on one row where they fit and moves
+// the rest to the next row where they do not, so the mod never guesses the slot's pixels and the
+// text is always drawn at its own size.
+
 // `fixed` keeps the size as given whatever the cardText setting: the model names, which fill their column.
 type TextOpts = { size?: number; w?: number; fill?: string; ls?: number; anchor?: string; fixed?: boolean }
 
-/** The gap between the row and the card, drawn inside the card. */
+/** The gap between the row and the card, drawn inside each tile. */
 const CARD_TOP = 6
+/** Each tile's height under that gap. */
+export const TILE_H = 132
 
-/** A footer line group under the card: the first line in `color`, the rest dim. */
-export type CardNote = { color: string; lines: string[] }
 
 /** The card's small text (labels and captions: 12 px and under; the model names keep theirs) in px over its own size, by setting. */
 export type CardText = 'small' | 'medium' | 'large' | 'xlarge'
 export const CARD_TEXT_BUMP: Record<CardText, number> = { small: 0, medium: 2, large: 3, xlarge: 5 }
 export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' || setting === 'large' || setting === 'xlarge' ? setting : 'small')
 
-export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, text: CardText = 'small'): { source: string; w: number; h: number; alt: string } => {
+/** One drawing of the card, at its own size in CSS pixels. `isInteractive` for the one that animates. */
+export type Tile = { key: 'idle' | 'size' | 'cost'; source: string; w: number; h: number; alt: string; isInteractive: boolean }
+
+/** A model column's width in the cost tile; the last one is as wide as its price needs. */
+const COST_COL = 92
+const COST_LAST = 90
+
+/**
+ * The card's three tiles. `header` puts Robo and the chip in the idle tile: off where the band's
+ * own row already shows them beside the card.
+ */
+export const cardTiles = (v: CacheView, text: CardText = 'small', header = true): Tile[] => {
   const mode = v.mode
   const L = WORDS[v.lang ?? 'en']
   const cold = mode === 'cold'
@@ -311,14 +320,18 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, te
   const t = (x: number, y: number, str: string, o: TextOpts = {}) =>
     `<text x="${x}" y="${y}" font-size="${o.fixed ? (o.size || 11) : sizeOf(o.size || 11)}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
     ` letter-spacing="${o.ls ?? 0}" text-anchor="${o.anchor || 'start'}">${str}</text>`
-  const vline = (x: number, y: number, h: number) => `<rect x="${x}" y="${y}" width="1" height="${h}" fill="${LINE}"/>`
-  const hline = (y: number) => `<rect x="13" y="${y}" width="${W - 26}" height="1" fill="${LINE}"/>`
+  // A tile: the card's top line across it, the zone under the gap.
+  const tile = (key: Tile['key'], w: number, zone: string, alt: string, isInteractive = false): Tile => {
+    const h = TILE_H + CARD_TOP
+    const body = `<g transform="translate(0 ${CARD_TOP})"><rect x="0" y="0" width="${w}" height="1" fill="${LINE}"/>` + zone + '</g>'
+    return { key, source: svgDoc(w, h, body, true), w, h, alt, isInteractive }
+  }
 
   // How long since the last reply, with Robo and the chip in the header.
-  const zoneIdle = (x: number, y: number, w: number, o: { compact?: boolean; header?: boolean } = {}) => {
-    const k = o.compact ? { lab: 24, big: 60, bs: 30, line: 80, cap: 100 } : { lab: 30, big: 72, bs: 38, line: 96, cap: 120 }
+  const zoneIdle = (x: number, y: number, w: number) => {
+    const k = { lab: 30, big: 72, bs: 38, line: 96, cap: 120 }
     let g = ''
-    if (o.header) {
+    if (header) {
       g += roboShapes(x - 2, y + k.lab - 17, 22, mode)
       const c = chipShapes(x + 26, y + k.lab - 13, L[mode], HUEM, 11, 1)
       g += c.svg + t(x + 26 + c.w + 8, y + k.lab, L.idle, { ls: 1.4 })
@@ -346,41 +359,28 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, te
     return g
   }
 
-  // The conversation's size, as a dot grid of the context window.
-  const zoneSize = (x: number, y: number, w: number, o: { compact?: boolean } = {}) => {
-    const share = v.window > 0 ? Math.min(1, v.tokens / v.window) : 0
-    let g = t(x, y + (o.compact ? 24 : 30), cold ? L.reCache : L.inCache, { ls: 1.4 })
-    const big = (yy: number, bs: number, ts: number) =>
-      `<text x="${x}" y="${yy}" font-weight="600" fill="${TEXT}"><tspan font-size="${bs}">${tok(v.tokens)}</tspan><tspan font-size="${ts}" font-weight="500" fill="${MUTED}" dx="7">tokens</tspan></text>`
-    const grid = (gx: number, gy: number, cols: number, step: number) => {
-      let d = ''
-      const lit = Math.round(share * cols * 2)
-      for (let r = 0; r < 2; r++)
-        for (let c = 0; c < cols; c++) d += `<circle cx="${gx + 3 + c * step}" cy="${gy + r * 9}" r="3" fill="${r * cols + c < lit ? HUEM : EMPTY}"/>`
-      return d
-    }
-    if (o.compact) {
-      const cols = 20
-      const gx = x + w - (cols - 1) * 9.6 - 6
-      return g + big(y + 56, 26, 14) + grid(gx, y + 42, cols, 9.6)
-    }
-    // 25 dots a row on the page; fewer only where the band is too narrow for them.
-    const cols = Math.max(10, Math.min(25, Math.floor(w / 9.6)))
-    return g + big(y + 72, 38, 15) + grid(x, y + 90, cols, 9.6) + t(x, y + 120, L.ofContext(Math.round(share * 100), tok(v.window)), { size: 12, w: 500 })
+  // The conversation's size, as a dot grid of the context window: 25 dots a row.
+  const share = v.window > 0 ? Math.min(1, v.tokens / v.window) : 0
+  const zoneSize = (x: number, y: number) => {
+    const cols = 25
+    let g = t(x, y + 30, cold ? L.reCache : L.inCache, { ls: 1.4 })
+    g += `<text x="${x}" y="${y + 72}" font-weight="600" fill="${TEXT}"><tspan font-size="38">${tok(v.tokens)}</tspan><tspan font-size="15" font-weight="500" fill="${MUTED}" dx="7">tokens</tspan></text>`
+    const lit = Math.round(share * cols * 2)
+    for (let r = 0; r < 2; r++)
+      for (let c = 0; c < cols; c++) g += `<circle cx="${x + 3 + c * 9.6}" cy="${y + 90 + r * 9}" r="3" fill="${r * cols + c < lit ? HUEM : EMPTY}"/>`
+    return g + t(x, y + 120, L.ofContext(Math.round(share * 100), tok(v.window)), { size: 12, w: 500 })
   }
 
   // What the next message costs, by model. One scale for both states (the cold
   // write's top price), so a warm read shows as the tiny bar it is.
-  const zoneCost = (x: number, y: number, colW: number, o: { compact?: boolean } = {}) => {
-    const k = o.compact
-      ? { lab: 24, base: 100, rows: 6, step: 7, chip: 58, price: 88, name: 102 }
-      : { lab: 30, base: 116, rows: 8, step: 8, chip: 70, price: 104, name: 120 }
+  const zoneCost = (x: number, y: number) => {
+    const k = { lab: 30, base: 116, rows: 8, step: 8, chip: 70, price: 104, name: 120 }
     let g = t(x, y + k.lab, L.nextCosts(cold), { ls: 1.4 })
     const top = Math.max(...MODELS.map(m => coldCost(rowFor(v, m), v.tokens, v.ttlMin)))
     MODELS.forEach((m, i) => {
       const mine = m.id === v.mine
       const n = top > 0 ? Math.max(1, Math.round((priceOf(v, m) / top) * k.rows)) : 1
-      const bx = x + i * colW
+      const bx = x + i * COST_COL
       for (let r = 0; r < k.rows; r++)
         for (let c = 0; c < 3; c++)
           g += `<circle cx="${bx + 3 + c * 8}" cy="${y + k.base - r * k.step}" r="2.8" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
@@ -391,43 +391,13 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, te
     return g
   }
 
-  let H: number
-  let g: string
-  if (kind === 'wide') {
-    H = 132
-    // 92 px a model column on the page's full width; tighter near the switch point,
-    // where the last column still needs about 90 px for its price.
-    const colW = Math.min(92, Math.floor((W - 640 - 103) / 3))
-    g = zoneIdle(13, 0, 290, { header: true }) + vline(314, 18, H - 36) + zoneSize(340, 0, 260) + vline(614, 18, H - 36) + zoneCost(640, 0, colW)
-  } else if (kind === 'stacked') {
-    H = 266
-    g =
-      zoneIdle(13, 0, 290, { header: true }) +
-      vline(314, 18, 96) +
-      zoneSize(340, 0, W - 340 - 13) +
-      hline(134) +
-      zoneCost(13, 134, Math.min(160, (W - 26) / 4))
-  } else {
-    // Narrow: the cache row above already shows Robo and the chip.
-    H = 296
-    g =
-      zoneIdle(13, 0, W - 26, { compact: true }) +
-      hline(110) +
-      zoneSize(13, 110, W - 26, { compact: true }) +
-      hline(180) +
-      zoneCost(13, 182, (W - 26) / 4, { compact: true })
-  }
-  if (note && note.lines.length > 0) {
-    g += hline(H)
-    note.lines.forEach((line, i) => {
-      g += t(13, H + 21 + i * 18, line, i === 0 ? { size: 13, fill: note.color } : { size: 12, w: 500 })
-    })
-    H += 10 + note.lines.length * 18 + 4
-  }
-  const h = H + CARD_TOP
-  const body = `<g transform="translate(0 ${CARD_TOP})">` + hline(0) + g + '</g>'
   const alt = cold
     ? L.altCold(v.idle, tok(v.tokens))
     : L.altWarm(Math.max(0, v.ttlMin - v.idleMin), tok(v.tokens))
-  return { source: svgDoc(W, h, body, true), w: W, h, alt }
+  const costs = MODELS.map(m => `${m.NAME} ${usd(priceOf(v, m))}`).join(', ')
+  return [
+    tile('idle', 13 + 290 + 13, zoneIdle(13, 0, 290), alt, true),
+    tile('size', 13 + 260 + 13, zoneSize(13, 0), L.ofContext(Math.round(share * 100), tok(v.window))),
+    tile('cost', 13 + (MODELS.length - 1) * COST_COL + COST_LAST + 13, zoneCost(13, 0), `${L.nextCosts(cold)}: ${costs}`),
+  ]
 }

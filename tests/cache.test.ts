@@ -54,8 +54,9 @@ test('a cold cache opens the card with the re-cache price, and Hide folds it to 
   const card = await band.find({ key: 'card' })
   expect(card).toBeDefined()
   expect(JSON.stringify(card)).toContain('Cache cold. Idle 3d 9h. Next message re-caches 770k tokens.')
-  // The page's width: 150 columns is a 1860 px band.
-  expect(JSON.stringify(card)).toContain('width=\\"1860\\"')
+  // Three tiles of their own width in a Box that wraps, whatever the band's columns.
+  expect((await band.find({ key: 'tiles' }))?.props.flexWrap).toBe('wrap')
+  for (const w of [316, 286, 392]) expect(JSON.stringify(card)).toContain(`width=\\"${w}\\"`)
 
   await band.press({ key: 'cache-fold' })
   expect(await band.find({ key: 'card' })).toBeUndefined()
@@ -84,9 +85,16 @@ test('squeezed, the folded cache stacks as a third block, then takes its own row
   const narrow = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 33 } })
   expect(await narrow.find({ key: 'cache' })).toBeDefined()
   await narrow.press({ key: 'cache-fold' })
-  // Narrow's card is the compact one: 38 columns is a 456 px band.
-  expect(JSON.stringify(await narrow.find({ key: 'card' }))).toContain('width=\\"456\\"')
+  // The narrow row shows Robo and the chip beside the card, so the idle tile leaves them out.
+  const idle = JSON.stringify(await narrow.find({ key: 'tile-idle' }))
+  expect(idle).toContain('IDLE')
+  expect(idle).not.toContain('>WARM<')
   await narrow.unmount()
+
+  // A wide row hides them while the card is open, so there the idle tile draws them.
+  const wide = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(JSON.stringify(await wide.find({ key: 'tile-idle' }))).toContain('>WARM<')
+  await wide.unmount()
 })
 
 test('the terminal draws the cache as text, with no drawings and no fold button', async ($, on) => {
@@ -459,7 +467,7 @@ test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xl
   expect(card).not.toContain('font-size=\\"12\\"')
 })
 
-test('the card leaves its box to the markup, so a narrower slot shrinks its height too', async ($, on) => {
+test('each tile leaves its box to the markup, so it draws at its own size and shrinks only in a narrower slot', async ($, on) => {
   mock.store(on)
   on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
@@ -470,11 +478,14 @@ test('the card leaves its box to the markup, so a narrower slot shrinks its heig
   await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
 
   const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  const svg = (await band.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('Cache cold'))
-  expect(svg).toBeDefined()
-  expect(svg?.props.width).toBeUndefined()
-  expect(svg?.props.height).toBeUndefined()
-  // The markup keeps its own size and viewBox, which the surface scales as one.
-  expect(svg?.props.source).toContain('viewBox="0 0 1860 ')
+  const tiles = (await band.findAll({ type: 'Svg' })).filter(s => String(s.props.source).includes('viewBox="0 0 ') && String(s.props.source).includes(' 138"'))
+  expect(tiles).toHaveLength(3)
+  for (const svg of tiles) {
+    expect(svg.props.width).toBeUndefined()
+    expect(svg.props.height).toBeUndefined()
+  }
+  // Only the idle tile animates (Robo), so only it is a frame.
+  expect(tiles.map(s => s.props.isInteractive)).toEqual([true, false, false])
+  expect(String(tiles[0]?.props.alt)).toContain('Cache cold')
   await band.unmount()
 })

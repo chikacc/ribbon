@@ -5,7 +5,7 @@ import type { CacheFacts, Compactions, Fold, PendingCompact, Window } from '../t
 import { COMPACT_TOOL, assessPrompt, zoneOf } from './assess'
 import {
   HUE, INK, ROBO_SIZE, TONES, TTL_MIN, ZONE_TONES,
-  bandPx, cardSvg, cardTextOf, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
+  cardTextOf, cardTiles, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
 import type { Lang } from './lang'
@@ -615,12 +615,26 @@ export const register: Register = (on, options) => {
             ],
           }
         : undefined
-      const c = cardSvg(view, kind, bandPx(columns), note, cardText)
-        // No width or height: bandPx guesses a cell's pixels, and where the slot is narrower the
-        // drawing shrinks to it. Sized by the markup, its height shrinks along, with no blank below.
+        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. No width or
+        // height on a tile: each is drawn at its own size, and shrinks only in a slot narrower than it.
+        // A narrow row shows Robo and the chip beside the card already, so the idle tile leaves them out.
+        const tiles = cardTiles(view, cardText, isWide || kind === 'stacked')
         card = (
-          <Box key="card" flexDirection="row">
-            <Svg source={c.source} alt={c.alt} isInteractive={kind !== 'tight'} />
+          <Box key="card" flexDirection="column">
+            <Box key="tiles" flexDirection="row" flexWrap="wrap">
+              {tiles.map(tile => (
+                <Box key={`tile-${tile.key}`}>
+                  <Svg source={tile.source} alt={tile.alt} isInteractive={tile.isInteractive} />
+                </Box>
+              ))}
+            </Box>
+            {note ? (
+              <Box key="note" flexDirection="column" paddingX={1}>
+                {note.lines.map((line, i) => (
+                  <Text key={`note-${i}`} color={i === 0 ? note.color : MUTED} bold={i === 0}>{line}</Text>
+                ))}
+              </Box>
+            ) : null}
           </Box>
         )
       }
