@@ -293,15 +293,22 @@ const CARD_TOP = 6
 /** A footer line group under the card: the first line in `color`, the rest dim. */
 export type CardNote = { color: string; lines: string[] }
 
-export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote): { source: string; w: number; h: number; alt: string } => {
+/** The card's small text (labels, captions, model names: 12 px and under) in px over its own size, by setting. */
+export type CardText = 'small' | 'medium' | 'large'
+export const CARD_TEXT_BUMP: Record<CardText, number> = { small: 0, medium: 2, large: 3 }
+export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' || setting === 'large' ? setting : 'small')
+
+export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, text: CardText = 'small'): { source: string; w: number; h: number; alt: string } => {
   const mode = v.mode
   const L = WORDS[v.lang ?? 'en']
   const cold = mode === 'cold'
   const HUEM = HUE[mode]
   const FIRE = HUE.warm
   const ICE = HUE.cold
+  const bump = CARD_TEXT_BUMP[text]
+  const sizeOf = (size: number) => (size <= 12 ? size + bump : size)
   const t = (x: number, y: number, str: string, o: TextOpts = {}) =>
-    `<text x="${x}" y="${y}" font-size="${o.size || 11}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
+    `<text x="${x}" y="${y}" font-size="${sizeOf(o.size || 11)}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
     ` letter-spacing="${o.ls ?? 0}" text-anchor="${o.anchor || 'start'}">${str}</text>`
   const vline = (x: number, y: number, h: number) => `<rect x="${x}" y="${y}" width="1" height="${h}" fill="${LINE}"/>`
   const hline = (y: number) => `<rect x="13" y="${y}" width="${W - 26}" height="1" fill="${LINE}"/>`

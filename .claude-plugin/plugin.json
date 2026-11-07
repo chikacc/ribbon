@@ -22,6 +22,20 @@
       "description": "en writes the band and the cache card in English; zh in Simplified Chinese (简体中文); zh-TW in Traditional Chinese (繁體中文)",
       "default": "en",
       "options": ["en", "zh", "zh-TW"]
+    },
+    "cardText": {
+      "type": "string",
+      "title": "Card text size",
+      "description": "how large the cache card's labels, captions and model names are: small as drawn upstream, medium 2 px larger, large 3 px larger",
+      "default": "small",
+      "options": ["small", "medium", "large"]
+    },
+    "stackGap": {
+      "type": "string",
+      "title": "Gap under other bands",
+      "description": "the space between another mod's band above (next-steps, say) and ribbon: none as upstream, sm a small step (no row in the terminal), md a larger one (one row in the terminal)",
+      "default": "sm",
+      "options": ["none", "sm", "md"]
     }
   }
 }

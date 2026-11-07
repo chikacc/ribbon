@@ -5,7 +5,7 @@ import type { CacheFacts, Compactions, Fold, PendingCompact, Window } from '../t
 import { COMPACT_TOOL, assessPrompt, zoneOf } from './assess'
 import {
   HUE, INK, ROBO_SIZE, TONES, TTL_MIN, ZONE_TONES,
-  bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
+  bandPx, cardSvg, cardTextOf, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
 import type { Lang } from './lang'
@@ -222,6 +222,11 @@ export const register: Register = (on, options) => {
   const used = options.usage === 'used'
   // userConfig `language`: en (default), zh or zh-TW.
   const lang = langOf(options.language)
+  // userConfig `cardText`: how large the cache card's small text is, small (default), medium or large.
+  const cardText = cardTextOf(options.cardText)
+  // userConfig `stackGap`: the space between another mod's band above (next-steps, say) and this
+  // one, as a step each surface sizes its own way; none (upstream), sm (default) or md.
+  const stackGap = options.stackGap === 'none' ? undefined : options.stackGap === 'md' ? 'md' : 'sm'
   const T = WORDS[lang]
 
   on('session.start', async ($, e, next) => {
@@ -607,7 +612,7 @@ export const register: Register = (on, options) => {
             ],
           }
         : undefined
-      const c = cardSvg(view, kind, bandPx(columns), note)
+      const c = cardSvg(view, kind, bandPx(columns), note, cardText)
         card = (
           <Box key="card" flexDirection="row">
             <Svg source={c.source} alt={c.alt} width={c.w} height={c.h} isInteractive={kind !== 'tight'} />
@@ -625,7 +630,7 @@ export const register: Register = (on, options) => {
     if (!above) return own
     const { Box } = $.ui.resolve(e)
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" {...(stackGap ? { rowGap: stackGap } : {})}>
         {above}
         {own}
       </Box>

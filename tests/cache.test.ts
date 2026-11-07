@@ -412,3 +412,40 @@ test('language: zh says the run-out in Chinese', { options: { language: 'zh' } }
   expect(card).toContain('重置')
   await band.unmount()
 })
+
+const cardOf = async ($: Parameters<import('claude-code/testing').TestBody>[0], on: import('claude-code').On) => {
+  mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const card = JSON.stringify(await band.find({ key: 'card' }))
+  await band.unmount()
+  return card
+}
+
+test('cardText: small draws the card\'s labels as upstream does', async ($, on) => {
+  const card = await cardOf($, on)
+  expect(card).toContain('font-size=\\"11\\"')
+  expect(card).toContain('font-size=\\"38\\"')
+})
+
+test('cardText: medium draws the labels 2 px larger and leaves the big figures alone', { options: { cardText: 'medium' } }, async ($, on) => {
+  const card = await cardOf($, on)
+  // The chips keep their measured 11 px; the 12 px captions move to 14.
+  expect(card).not.toContain('font-size=\\"12\\"')
+  expect(card).toContain('font-size=\\"13\\"')
+  expect(card).toContain('font-size=\\"14\\"')
+  expect(card).toContain('font-size=\\"38\\"')
+})
+
+test('cardText: large draws the labels 3 px larger', { options: { cardText: 'large' } }, async ($, on) => {
+  const card = await cardOf($, on)
+  expect(card).toContain('font-size=\\"14\\"')
+  expect(card).toContain('font-size=\\"15\\"')
+  expect(card).not.toContain('font-size=\\"12\\"')
+})
