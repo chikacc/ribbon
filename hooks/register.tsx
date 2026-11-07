@@ -621,18 +621,19 @@ export const register: Register = (on, options) => {
             ],
           }
         : undefined
-        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. Every tile
-        // names its own size: the idle frame left without one takes a frame's default 300 by 150 px,
-        // and on the desktop the unsized images were drawn larger too and wrapped. Their tops align, so
-        // the line each draws across its top meets the next one's. A narrow row shows Robo and the chip
-        // beside the card already, so the idle tile leaves them out.
+        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. The idle tile
+        // is a frame, which left without a size takes a frame's default 300 by 150 px, so it names its
+        // own and never shrinks. The other two are images: unsized, they keep their own size and
+        // shrink in a slot narrower than they are. Their tops align, so the line each draws across its
+        // top meets the next one's. A narrow row shows Robo and the chip beside the card already, so
+        // the idle tile leaves them out.
         const tiles = cardTiles(view, cardText, isWide || kind === 'stacked')
         card = (
           <Box key="card" flexDirection="column">
             <Box key="tiles" flexDirection="row" flexWrap="wrap" alignItems="flex-start">
               {tiles.map(tile => (
-                <Box key={`tile-${tile.key}`} flexShrink={0}>
-                  <Svg source={tile.source} alt={tile.alt} width={tile.w} height={tile.h} isInteractive={tile.isInteractive} />
+                <Box key={`tile-${tile.key}`} {...(tile.isInteractive ? { flexShrink: 0 } : {})}>
+                  <Svg source={tile.source} alt={tile.alt} isInteractive={tile.isInteractive} {...(tile.isInteractive ? { width: tile.w, height: tile.h } : {})} />
                 </Box>
               ))}
             </Box>
