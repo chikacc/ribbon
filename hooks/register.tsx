@@ -649,9 +649,11 @@ export const register: Register = (on, options) => {
         )
       }
 
+      // A native button stands taller than a line of text, so rows that hold one would touch: a
+      // small step parts them on a graphical surface, and nothing in the terminal.
       return (
         <Box flexDirection="column">
-          {rows}
+          <Box key="rows" flexDirection="column" rowGap="xs">{rows}</Box>
           {card}
         </Box>
       )

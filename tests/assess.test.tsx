@@ -242,3 +242,14 @@ test('the context gauge shows at every width, so its colour and the assess butto
     await ui.unmount()
   }
 })
+
+test('the rows part by a small step, so the assess row does not touch the Show / Hide one', async ($, on) => {
+  mock.clock(on, { now: STARTED_AT })
+  answerSession(on, 400_000)
+  await resume($, 400_000)
+
+  const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 33 } })
+  expect(await ui.find({ key: 'assess-row' })).toBeDefined()
+  expect((await ui.find({ key: 'rows' }))?.props.rowGap).toBe('xs')
+  await ui.unmount()
+})
