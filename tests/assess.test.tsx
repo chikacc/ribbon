@@ -253,3 +253,24 @@ test('the rows part by a small step, so the assess row does not touch the Show /
   expect((await ui.find({ key: 'rows' }))?.props.rowGap).toBe('xs')
   await ui.unmount()
 })
+
+test('off the one-row layouts the blocks wrap beside the label, a small step apart, so a wrapped block lines up under 7D', async ($, on) => {
+  mock.clock(on, { now: STARTED_AT })
+  answerSession(on, 400_000)
+  await resume($, 400_000)
+
+  for (const bodyColumns of [53, 33]) {
+    const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
+    const row = await ui.find({ key: 'row' })
+    const blocks = await ui.find({ key: 'blocks' })
+    expect(row?.props.flexWrap, `the outer row at ${bodyColumns} columns`).toBeUndefined()
+    expect(blocks?.props.flexWrap).toBe('wrap')
+    expect(blocks?.props.rowGap).toBe('xs')
+    expect(blocks?.text, `CTX in the group at ${bodyColumns} columns`).toMatch(/CTX/)
+    await ui.unmount()
+  }
+
+  const wide = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect((await wide.find({ key: 'row' }))?.props.rowGap).toBe('xs')
+  await wide.unmount()
+})

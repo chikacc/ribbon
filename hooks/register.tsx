@@ -547,7 +547,7 @@ export const register: Register = (on, options) => {
       let rows
       if (isWide) {
         rows = (
-          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1} alignItems="center">
+          <Box key="row" flexDirection="row" flexWrap="wrap" rowGap="xs" paddingX={1} alignItems="center">
             {label}
             {usage}
             {open ? null : (
@@ -563,10 +563,12 @@ export const register: Register = (on, options) => {
           </Box>
         )
       } else if (kind === 'stacked') {
-        // The cache becomes a third stacked block, the same shape as 7D and 5H.
+        // The cache becomes a third stacked block, the same shape as 7D and 5H. The blocks wrap in a
+        // group beside the label, so a wrapped one lines up under 7D, a small step below it.
         rows = (
-          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1}>
+          <Box key="row" flexDirection="row" paddingX={1}>
             {label}
+            <Box key="blocks" flexDirection="row" flexWrap="wrap" rowGap="xs" flexShrink={1}>
             {usage}
             {open ? null : (
               <Box key="block" flexDirection="column" flexShrink={0} marginRight={2}>
@@ -581,18 +583,20 @@ export const register: Register = (on, options) => {
               </Box>
             )}
             {compacted}
+            </Box>
             {grow}
             {button}
           </Box>
         )
       } else {
-        // Narrow: the cache gets its own row under the usage blocks.
+        // Narrow: the cache gets its own row under the usage blocks. The blocks wrap in a group of
+        // their own, so a block that moves to the next line stays under 7D, not under the label.
         rows = [
-          <Box key="row" flexDirection="row" flexWrap="wrap" paddingX={1}>
+          <Box key="row" flexDirection="row" paddingX={1}>
             {label}
-            {usage}
+            <Box key="blocks" flexDirection="row" flexWrap="wrap" rowGap="xs" flexShrink={1}>{usage}</Box>
           </Box>,
-          <Box key="cache" flexDirection="row" flexWrap="wrap" paddingX={1} alignItems="center">
+          <Box key="cache" flexDirection="row" flexWrap="wrap" rowGap="xs" paddingX={1} alignItems="center">
             {badge}
             {summary}
             {compacted}
