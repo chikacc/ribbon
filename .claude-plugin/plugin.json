@@ -26,7 +26,7 @@
     "cardText": {
       "type": "string",
       "title": "Card text size",
-      "description": "how large the cache card's labels, captions and model names are: small as drawn upstream, medium 2 px larger, large 3 px larger, xlarge 5 px larger",
+      "description": "how large the cache card's labels and captions are: small as drawn upstream, medium 2 px larger, large 3 px larger, xlarge 5 px larger",
       "default": "small",
       "options": ["small", "medium", "large", "xlarge"]
     },

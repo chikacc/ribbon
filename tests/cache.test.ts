@@ -454,5 +454,7 @@ test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xl
   const card = await cardOf($, on)
   expect(card).toContain('font-size=\\"16\\"')
   expect(card).toContain('font-size=\\"17\\"')
+  // The model names keep 11 px, so SONNET stays inside its column.
+  expect(card).toMatch(/font-size=\\"11\\"[^>]*>SONNET</)
   expect(card).not.toContain('font-size=\\"12\\"')
 })

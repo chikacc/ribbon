@@ -285,7 +285,8 @@ export const ROBO_SIZE = 26
 export const roboSvg = (mode: Mode): string => svgDoc(ROBO_SIZE, ROBO_SIZE, roboShapes(0, 0, ROBO_SIZE, mode), false)
 
 // ---------- The card, laid out for the band's width ----------
-type TextOpts = { size?: number; w?: number; fill?: string; ls?: number; anchor?: string }
+// `fixed` keeps the size as given whatever the cardText setting: the model names, which fill their column.
+type TextOpts = { size?: number; w?: number; fill?: string; ls?: number; anchor?: string; fixed?: boolean }
 
 /** The gap between the row and the card, drawn inside the card. */
 const CARD_TOP = 6
@@ -293,7 +294,7 @@ const CARD_TOP = 6
 /** A footer line group under the card: the first line in `color`, the rest dim. */
 export type CardNote = { color: string; lines: string[] }
 
-/** The card's small text (labels, captions, model names: 12 px and under) in px over its own size, by setting. */
+/** The card's small text (labels and captions: 12 px and under; the model names keep theirs) in px over its own size, by setting. */
 export type CardText = 'small' | 'medium' | 'large' | 'xlarge'
 export const CARD_TEXT_BUMP: Record<CardText, number> = { small: 0, medium: 2, large: 3, xlarge: 5 }
 export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' || setting === 'large' || setting === 'xlarge' ? setting : 'small')
@@ -308,7 +309,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, te
   const bump = CARD_TEXT_BUMP[text]
   const sizeOf = (size: number) => (size <= 12 ? size + bump : size)
   const t = (x: number, y: number, str: string, o: TextOpts = {}) =>
-    `<text x="${x}" y="${y}" font-size="${sizeOf(o.size || 11)}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
+    `<text x="${x}" y="${y}" font-size="${o.fixed ? (o.size || 11) : sizeOf(o.size || 11)}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
     ` letter-spacing="${o.ls ?? 0}" text-anchor="${o.anchor || 'start'}">${str}</text>`
   const vline = (x: number, y: number, h: number) => `<rect x="${x}" y="${y}" width="1" height="${h}" fill="${LINE}"/>`
   const hline = (y: number) => `<rect x="13" y="${y}" width="${W - 26}" height="1" fill="${LINE}"/>`
@@ -385,7 +386,7 @@ export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, te
           g += `<circle cx="${bx + 3 + c * 8}" cy="${y + k.base - r * k.step}" r="2.8" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
       if (mine) g += chipShapes(bx + 30, y + k.chip, L.you, HUEM, 10, 0.8).svg
       g += t(bx + 30, y + k.price, usd(priceOf(v, m)), { size: 17, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
-      g += t(bx + 30, y + k.name, m.NAME, { size: 11, w: 700, fill: mine ? HUEM : MUTED, ls: 0.8 })
+      g += t(bx + 30, y + k.name, m.NAME, { size: 11, w: 700, fill: mine ? HUEM : MUTED, ls: 0.8, fixed: true })
     })
     return g
   }
