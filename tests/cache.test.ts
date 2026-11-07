@@ -492,3 +492,26 @@ test('the idle frame names its size so it does not stretch to the 300 px frame d
   expect(String(tiles[0]?.props.alt)).toContain('Cache cold')
   await band.unmount()
 })
+
+test('in a narrow band the cost tile sits two models a row, so it fits the slot', async ($, on) => {
+  mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const costOf = async (bodyColumns: number) => {
+    const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
+    const source = String((await band.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('NEXT MESSAGE COSTS'))?.props.source)
+    await band.unmount()
+    return source.match(/^<svg[^>]*width="(\d+)" height="(\d+)"/)?.slice(1).map(Number)
+  }
+  // Four in a row on the wide row; two by two, 222 px wide, under the narrow row.
+  expect(await costOf(150)).toEqual([296, 118])
+  const [w, h] = (await costOf(33)) ?? []
+  expect(w).toBe(222)
+  expect(h).toBeGreaterThan(118)
+})

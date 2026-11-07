@@ -627,7 +627,7 @@ export const register: Register = (on, options) => {
         // shrink in a slot narrower than they are. Their tops align, so the line each draws across its
         // top meets the next one's. A narrow row shows Robo and the chip beside the card already, so
         // the idle tile leaves them out.
-        const tiles = cardTiles(view, cardText, isWide || kind === 'stacked')
+        const tiles = cardTiles(view, cardText, isWide || kind === 'stacked', !isWide && kind === 'tight')
         card = (
           <Box key="card" flexDirection="column">
             <Box key="tiles" flexDirection="row" flexWrap="wrap" alignItems="flex-start">

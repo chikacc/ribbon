@@ -303,12 +303,16 @@ export type Tile = { key: 'idle' | 'size' | 'cost'; source: string; w: number; h
 /** A model column's width in the cost tile; the last one is as wide as its price needs. */
 const COST_COL = 68
 const COST_LAST = 66
+/** In a narrow band: a model column's width, two to a row, and the step from one row to the next. */
+const COST_COL_NARROW = 130
+const COST_ROW = 72
 
 /**
  * The card's three tiles. `header` puts Robo and the chip in the idle tile: off where the band's
- * own row already shows them beside the card.
+ * own row already shows them beside the card. `narrow` lays the cost tile two models a row, for a
+ * band too narrow for its four in a row.
  */
-export const cardTiles = (v: CacheView, text: CardText = 'small', header = true): Tile[] => {
+export const cardTiles = (v: CacheView, text: CardText = 'small', header = true, narrow = false): Tile[] => {
   const mode = v.mode
   const L = WORDS[v.lang ?? 'en']
   const cold = mode === 'cold'
@@ -321,8 +325,8 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
     `<text x="${x}" y="${y}" font-size="${o.fixed ? (o.size || 11) : sizeOf(o.size || 11)}" font-weight="${o.w || 700}" fill="${o.fill || MUTED}"` +
     ` letter-spacing="${o.ls ?? 0}" text-anchor="${o.anchor || 'start'}">${str}</text>`
   // A tile: the card's top line across it, the zone under the gap.
-  const tile = (key: Tile['key'], w: number, zone: string, alt: string, isInteractive = false): Tile => {
-    const h = TILE_H + CARD_TOP
+  const tile = (key: Tile['key'], w: number, zone: string, alt: string, isInteractive = false, zoneH = TILE_H): Tile => {
+    const h = zoneH + CARD_TOP
     const body = `<g transform="translate(0 ${CARD_TOP})"><rect x="0" y="0" width="${w}" height="1" fill="${LINE}"/>` + zone + '</g>'
     return { key, source: svgDoc(w, h, body, true), w, h, alt, isInteractive }
   }
@@ -372,24 +376,36 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
   }
 
   // What the next message costs, by model. One scale for both states (the cold
-  // write's top price), so a warm read shows as the tiny bar it is.
+  // write's top price), so a warm read shows as the tiny bar it is. In a narrow band the models
+  // sit two by two under a label in two lines, so the tile fits the slot.
+  const label = L.nextCosts(cold)
+  const lines = narrow ? label.split(/(?<=,)\s*|(?=\()/).filter(s => s !== '') : [label]
+  const lineGap = 14 + bump + 2
+  const perRow = narrow ? 2 : MODELS.length
+  const colW = narrow ? COST_COL_NARROW : COST_COL
+  // A model column: the dots end at `base`; the chip, the price and the name sit beside them.
+  const firstBase = 30 + (lines.length - 1) * lineGap + 74
   const zoneCost = (x: number, y: number) => {
-    const k = { lab: 30, base: 104, rows: 8, step: 7, chip: 58, price: 92, name: 106 }
-    let g = t(x, y + k.lab, L.nextCosts(cold), { ls: 1.4 })
+    const k = { rows: 8, step: 7, chip: -46, price: -12, name: 2 }
+    let g = lines.map((line, i) => t(x, y + 30 + i * lineGap, line, { ls: 1.4 })).join('')
     const top = Math.max(...MODELS.map(m => coldCost(rowFor(v, m), v.tokens, v.ttlMin)))
     MODELS.forEach((m, i) => {
       const mine = m.id === v.mine
       const n = top > 0 ? Math.max(1, Math.round((priceOf(v, m) / top) * k.rows)) : 1
-      const bx = x + i * COST_COL
+      const bx = x + (i % perRow) * colW
+      const base = y + firstBase + Math.floor(i / perRow) * COST_ROW
       for (let r = 0; r < k.rows; r++)
         for (let c = 0; c < 3; c++)
-          g += `<circle cx="${bx + 3 + c * 6.5}" cy="${y + k.base - r * k.step}" r="2.5" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
-      if (mine) g += chipShapes(bx + 22, y + k.chip, L.you, HUEM, 10, 0.8).svg
-      g += t(bx + 22, y + k.price, usd(priceOf(v, m)), { size: 15, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
-      g += t(bx + 22, y + k.name, m.NAME, { size: 10, w: 700, fill: mine ? HUEM : MUTED, ls: 0, fixed: true })
+          g += `<circle cx="${bx + 3 + c * 6.5}" cy="${base - r * k.step}" r="2.5" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
+      if (mine) g += chipShapes(bx + 22, base + k.chip, L.you, HUEM, 10, 0.8).svg
+      g += t(bx + 22, base + k.price, usd(priceOf(v, m)), { size: 15, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
+      g += t(bx + 22, base + k.name, m.NAME, { size: 10, w: 700, fill: mine ? HUEM : MUTED, ls: 0, fixed: true })
     })
     return g
   }
+  const costRows = Math.ceil(MODELS.length / perRow)
+  const costW = 13 + (perRow - 1) * colW + COST_LAST + 13
+  const costH = Math.max(TILE_H, firstBase + (costRows - 1) * COST_ROW + 8)
 
   const alt = cold
     ? L.altCold(v.idle, tok(v.tokens))
@@ -398,6 +414,6 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
   return [
     tile('idle', 13 + 176 + 13, zoneIdle(13, 0, 176), alt, true),
     tile('size', 13 + 166 + 13, zoneSize(13, 0), L.ofContext(Math.round(share * 100), tok(v.window))),
-    tile('cost', 13 + (MODELS.length - 1) * COST_COL + COST_LAST + 13, zoneCost(13, 0), `${L.nextCosts(cold)}: ${costs}`),
+    tile('cost', costW, zoneCost(13, 0), `${label}: ${costs}`, false, costH),
   ]
 }
