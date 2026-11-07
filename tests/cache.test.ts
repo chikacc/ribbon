@@ -18,6 +18,7 @@ const COLD_IDLE = (3 * 24 + 9) * 3600 // 3d 9h: cold
 
 test('a warm cache shows Robo, the WARM chip and the minutes left, folded', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -41,6 +42,7 @@ test('a warm cache shows Robo, the WARM chip and the minutes left, folded', asyn
 
 test('a cold cache opens the card with the re-cache price, and Hide folds it to one row', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -65,6 +67,7 @@ test('a cold cache opens the card with the re-cache price, and Hide folds it to 
 
 test('squeezed, the folded cache stacks as a third block, then takes its own row', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -88,6 +91,7 @@ test('squeezed, the folded cache stacks as a third block, then takes its own row
 
 test('the terminal draws the cache as text, with no drawings and no fold button', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -106,6 +110,7 @@ test('the terminal draws the cache as text, with no drawings and no fold button'
 
 test('a cleared session drops the cache until the next reply', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -127,6 +132,7 @@ const FIVE_MIN_TAIL = [
 
 test('after a resume the cold price is Claude Code\'s own estimate, not the table\'s', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -142,6 +148,7 @@ test('after a resume the cold price is Claude Code\'s own estimate, not the tabl
 
 test('a session on the 5-minute cache goes cold after 5 minutes and prices the 1.25x write', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -159,6 +166,7 @@ test('a session on the 5-minute cache goes cold after 5 minutes and prices the 1
 
 test('with no transcript to read, the cache keeps its 1-hour length', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -173,6 +181,7 @@ test('with no transcript to read, the cache keeps its 1-hour length', async ($, 
 
 test('between the compact and full widths the band stays one row, in short words', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -196,6 +205,7 @@ test('between the compact and full widths the band stays one row, in short words
 
 test('a folded cold cache on the short row shows the price, or the idle time for an unpriced model', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -218,6 +228,7 @@ test('a folded cold cache on the short row shows the price, or the idle time for
 
 test('the terminal draws the short row as text too', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -235,6 +246,7 @@ test('the terminal draws the short row as text too', async ($, on) => {
 
 test('the full row adds a CTX gauge with the share of the context window left', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -251,6 +263,7 @@ test('the full row adds a CTX gauge with the share of the context window left', 
 
 test('usage: used shows the spent share, the filled dots and the context as used', { options: { usage: 'used' } }, async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -268,6 +281,7 @@ test('usage: used shows the spent share, the filled dots and the context as used
 
 test('a session on an older model is priced at that model\'s rate, not the 5.5 row\'s', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 200000 }, rateLimits: WINDOWS } }))
@@ -283,6 +297,7 @@ test('a session on an older model is priced at that model\'s rate, not the 5.5 r
 
 test('with no plan limits (an API key) the cache lives 5 minutes and prices the 1.25x write', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: [] } }))
@@ -299,6 +314,7 @@ test('with no plan limits (an API key) the cache lives 5 minutes and prices the 
 
 test('the windows are coloured by their pace, not by which window they are', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   // 5H: 60% used with 4 of 5 hours left (20% of the time gone), far ahead. 7D: 10% used, half the week gone.
@@ -317,6 +333,7 @@ test('the windows are coloured by their pace, not by which window they are', asy
 
 test('a 7-day limit set to run out early shows the warning in the row and the details in the Show card', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('classic.SessionStart', () => ({}))
@@ -350,6 +367,7 @@ test('a 7-day limit set to run out early shows the warning in the row and the de
 
 test('language: zh writes the band, the button and the card in Chinese', { options: { language: 'zh' } }, async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
@@ -377,6 +395,7 @@ test('language: zh writes the band, the button and the card in Chinese', { optio
 
 test('language: zh says the run-out in Chinese', { options: { language: 'zh' } }, async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('classic.SessionStart', () => ({}))

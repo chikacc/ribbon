@@ -4,6 +4,16 @@
 
 # ribbon
 
+> **This fork** ([chikacc/ribbon](https://github.com/chikacc/ribbon)) builds on [henryz78/ribbon](https://github.com/henryz78/ribbon), itself a fork of [robonuggets/ribbon](https://github.com/robonuggets/ribbon). On top of it the band:
+>
+> - colours **CTX** by how close the context is to auto-compaction: blue under 150k tokens, yellow from 150k to 90% of the auto-compaction threshold, red past that;
+> - from 150k on, shows an **Ask agent** button (hotkey `a`) that submits a prompt asking the agent whether to compact, hand over to a new session or carry on, as a question with its pick first;
+> - registers the tool `mcp__ribbon__compact_after_turn`: once the person picks compaction, the agent calls it with what the summary should keep, and the band runs `/compact <instructions>` as the turn ends (`$.session.compact` is refused on the desktop host, so it goes through `$.command.run`);
+> - counts the session's compactions (`compacted 2x`);
+> - speaks Traditional Chinese with `language: zh-TW`.
+>
+> These come from context-meter, a private mod of the same author that this fork replaces.
+
 A free mod for Claude Code. It adds a slim band above your prompt that shows:
 
 - **How much usage you have left** in your 7-day and 5-hour windows, and when each one resets.
@@ -26,7 +36,7 @@ One row. That's the whole footprint.
 The easy way: send this link to your agent and say "install this".
 
 ```
-https://github.com/robonuggets/ribbon
+https://github.com/chikacc/ribbon
 ```
 
 Your agent runs one command. The band shows up in your next session.
@@ -36,7 +46,7 @@ Your agent runs one command. The band shows up in your next session.
 If you are an agent and your user asked you to install this, run this in a shell:
 
 ```
-claude plugin install ribbon --marketplace robonuggets/ribbon
+claude plugin install ribbon --marketplace chikacc/ribbon
 ```
 
 It installs for the user (all their projects) and adds the marketplace on its own. Then tell your user: "Ribbon is installed. Start a new session to see the band above your prompt." Do not edit their settings file by hand.
@@ -46,7 +56,7 @@ It installs for the user (all their projects) and adds the marketplace on its ow
 In a Claude Code terminal session, type:
 
 ```
-/plugin install ribbon --marketplace robonuggets/ribbon
+/plugin install ribbon --marketplace chikacc/ribbon
 ```
 
 1. Type `y` when it asks `Add marketplace?`.
@@ -64,15 +74,15 @@ In a Claude Code terminal session, type:
 - If a window drops under 15%, a bold **LOW** shows next to it.
 
 - **Run-out warning.** When this week's pace would use up the 7-day limit before it resets, 7D shows `⚠ Sun night` (when it runs out) in place of the reset countdown: yellow, red within a day. Click **Show** in the app for the numbers and the reset time. It needs a day of the week gone and 15% used. Where there is no card to show them (the terminal, or before the first reply) the warning is added to the row and the reset stays.
-- **CTX** (violet) is how much of the context window is left, with the token count (`770k/1M`), shown after the first reply when the row has room.
+- **CTX** is how much of the context window is left, coloured blue, yellow or red by how close it is to auto-compaction (see above), with the token count (`770k/1M`), shown after the first reply when the row has room.
 - The band has no background of its own: it follows the app's light or dark theme.
 
 ### Settings
 
-Open `/config` and find **ribbon**, or run `claude plugin configure ribbon@robonuggets`.
+Open `/config` and find **ribbon**, or run `claude plugin configure ribbon@chikacc`.
 
 - **Usage figure:** `left` (default) shows how much of each window and of the context is left. `used` shows how much is spent, and the dots fill with it. LOW still means under 15% left.
-- **Language:** `en` (default) or `zh`. `zh` writes the band, the Show button and the cache card in Chinese. Durations (`3d 9h`, `42m`) and model names stay as they are in both.
+- **Language:** `en` (default), `zh` or `zh-TW`. `zh` writes the band, the buttons and the cache card in Simplified Chinese, `zh-TW` in Traditional Chinese. Durations (`3d 9h`, `42m`) and model names stay as they are in all of them. The Ask agent prompt is in Traditional Chinese whatever the setting.
 
 ### The prompt cache
 
@@ -95,7 +105,7 @@ The card shows how long you've been idle, how many tokens are in the cache, and 
 
 ## Good to know
 
-- **It costs nothing to run.** It reads the app's own numbers and draws them. It never calls a model.
+- **It costs nothing to run.** It reads the app's own numbers and draws them. It never calls a model on its own: the only prompt it sends is the Ask agent one, when you press the button.
 - **Prices are estimates.** They come from a price table in `hooks/cache-art.ts` (`MODELS`), not from your bill. If prices change, edit that table.
 - **Older models are priced as themselves.** The table in `hooks/cache-art.ts` has the 5.5 rows, and `OLDER` lists the rate of each older model by id (Sonnet 4.5, Opus 4.1, and so on).
 - **The cache length is worked out, not assumed.** 5 minutes or 1 hour: from Claude Code's cache settings (`FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`), then the plan (a subscription within its limits gets 1 hour, an API key 5 minutes), then what your own requests show.
@@ -110,11 +120,12 @@ ribbon/
 │   └── marketplace.json    makes this repo installable
 ├── hooks/
 │   ├── hooks.json          points to the module
-│   ├── register.tsx        the band: usage, cache tracking, layout
+│   ├── register.tsx        the band: usage, cache tracking, layout, the compact tool
+│   ├── assess.ts           the context zones and the Ask agent prompt
 │   ├── cache-art.ts        the cache card and robot drawings, the price table
 │   └── font.ts             Outfit, embedded so the drawings render anywhere
 ├── types/index.d.ts        the shape of what the band remembers
-├── tests/                  7 tests: layouts, warm and cold, terminal, cleared sessions
+├── tests/                  layouts, warm and cold, terminal, cleared sessions, the context zones and compaction
 └── assets/                 banner, screenshots, hex icon
 ```
 

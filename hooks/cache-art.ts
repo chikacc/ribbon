@@ -16,7 +16,9 @@ export const EMPTY = '#4a463b'
 export const LINE = '#36332b'
 // Both usage windows take the colour of their pace against the clock (see pace.ts).
 export const TONES: Record<'calm' | 'fast' | 'alert', string> = { calm: '#3a9a62', fast: '#e0b000', alert: '#d64545' }
-export const VIOLET = '#a98bd6'
+// The context gauge takes the colour of its zone (see assess.ts): blue with room to spare,
+// then the windows' own yellow and red.
+export const ZONE_TONES: Record<'roomy' | 'weighing' | 'close', string> = { roomy: '#2f7de1', weighing: TONES.fast, close: TONES.alert }
 
 // The cache's two states in a muted shade: desaturated so they sit
 // beside the band's own orange and yellow.
@@ -184,6 +186,10 @@ const CHIP: Record<string, { w: number; h: number }> = {
   '热@11': { w: 34, h: 18 },
   '冷@11': { w: 34, h: 18 },
   '当前@10': { w: 38, h: 17 },
+  // zh-TW: one CJK glyph is as wide as another, so the zh sizes hold.
+  '熱@13': { w: 40, h: 21 },
+  '熱@11': { w: 34, h: 18 },
+  '目前@10': { w: 38, h: 17 },
 }
 
 export const chipShapes = (x: number, y: number, word: string, fill: string, size: number, ls: number): { w: number; h: number; svg: string } => {

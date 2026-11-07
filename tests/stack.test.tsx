@@ -11,6 +11,7 @@ const PROPS = {
 
 test("another mod's band beneath ribbon draws above ribbon's own", async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: Date.parse('2098-12-31T22:00:00Z') })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({

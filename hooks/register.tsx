@@ -1,9 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { CacheFacts, Fold, Window } from '../types'
+import type { CacheFacts, Compactions, Fold, PendingCompact, Window } from '../types'
+import { COMPACT_TOOL, assessPrompt, zoneOf } from './assess'
 import {
-  HUE, INK, ROBO_SIZE, TONES, TTL_MIN, VIOLET,
+  HUE, INK, ROBO_SIZE, TONES, TTL_MIN, ZONE_TONES,
   bandPx, cardSvg, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
 } from './cache-art'
 import type { CacheView } from './cache-art'
@@ -22,6 +23,11 @@ import { OUT_ALERT, clockOf, dateOf, dayPart, runOutOf, toneOf } from './pace'
 // next message costs to re-cache. Hide / Show folds the card; warm starts folded,
 // cold starts open, and a choice holds until the cache flips. Zero token cost:
 // it reads the engine's own figures and draws.
+//
+// The CTX gauge is coloured by how close the context is to auto-compaction (assess.ts).
+// From 150k tokens on, an "Ask agent" button submits a prompt, only when the person
+// presses it, asking the agent whether to compact, hand over or carry on; the agent
+// compacts through the compact_after_turn tool once the person picks it.
 
 // Theme keys, so the band's text follows the person's light or dark theme.
 const TEXT = 'text'
@@ -45,6 +51,10 @@ const TICK_MS = 30_000
 const windows = atom({ plugin: 'ribbon', key: 'windows' } as const, [] as Window[])
 const cache = atom({ plugin: 'ribbon', key: 'cache' } as const, null as CacheFacts | null)
 const fold = atom({ plugin: 'ribbon', key: 'fold' } as const, null as Fold | null)
+const threshold = atom({ plugin: 'ribbon', key: 'threshold' } as const, null as number | null)
+const compactions = atom({ plugin: 'ribbon', key: 'compactions' } as const, null as Compactions | null)
+const isAssessQueued = atom({ plugin: 'ribbon', key: 'isAssessQueued' } as const, false)
+const pendingCompact = atom({ plugin: 'ribbon', key: 'pendingCompact' } as const, null as PendingCompact | null)
 
 const NAMES: Record<string, string> = { seven_day: '7D', five_hour: '5H', spend_limit: 'SPEND', context: 'CTX' }
 const ORDER: Record<string, number> = { seven_day: 0, five_hour: 1 }
@@ -156,14 +166,26 @@ const seedFromTranscript = async ($: EngineInterface): Promise<void> => {
   await update($, cache, c => c ?? { lastAt: r.at, tokens: r.tokens, window, model: r.model, ttlMin })
 }
 
+/**
+ * The usage figures with the summary breakdown, which carries the auto-compaction threshold, and
+ * that threshold kept: null while auto-compaction is off, the last one when no breakdown came back.
+ * A summary breakdown estimates locally and sends nothing, so it is cheap enough per turn end.
+ */
+const usageWithThreshold = async ($: EngineInterface) => {
+  const u = await $.session.usage({ breakdown: 'summary' })
+  const b = u.context.breakdown
+  if (b) await update($, threshold, () => (b.isAutoCompactEnabled ? (b.autoCompactThreshold ?? null) : null))
+  return u
+}
+
 const pull = async ($: EngineInterface): Promise<void> => {
-  const u = await $.session.usage()
+  const u = await usageWithThreshold($)
   await update($, windows, () => clean(u.rateLimits))
 }
 
 /** Fresh context figures from the engine onto the cache facts, when it has them. */
 const measure = async ($: EngineInterface, lastAt: number | null, model: string | null): Promise<void> => {
-  const u = await $.session.usage()
+  const u = await usageWithThreshold($)
   const m = model ?? (await $.session.model())
   await update($, cache, c => ({
     ...c,
@@ -174,10 +196,31 @@ const measure = async ($: EngineInterface, lastAt: number | null, model: string 
   }))
 }
 
+/** Asks the agent whether to compact, hand over or carry on; only ever from the person's press. */
+const assess = async ($: EngineInterface, tokens: number, window: number): Promise<void> => {
+  await update($, isAssessQueued, () => true)
+  const limit = await read($, threshold)
+  try {
+    await $.prompt.submit({ text: assessPrompt(tok(tokens), tok(window), limit === null ? null : tok(limit)) })
+  } catch (error) {
+    await update($, isAssessQueued, () => false)
+    $.ui.toast(String(error), { timeoutMs: 10_000 })
+  }
+}
+
+// `$.session.compact` is refused on the desktop host; the /compact command runs once the session is idle.
+const runCompact = async ($: EngineInterface, instructions: string, toast: (reason: string) => string): Promise<void> => {
+  try {
+    await $.command.run({ command: 'compact', args: instructions })
+  } catch (error) {
+    $.ui.toast(toast(String(error)), { timeoutMs: 10_000 })
+  }
+}
+
 export const register: Register = (on, options) => {
   // userConfig `usage`: whether the bars show what is left (default) or what is used.
   const used = options.usage === 'used'
-  // userConfig `language`: en (default) or zh.
+  // userConfig `language`: en (default), zh or zh-TW.
   const lang = langOf(options.language)
   const T = WORDS[lang]
 
@@ -186,6 +229,15 @@ export const register: Register = (on, options) => {
     await loadEnv($)
     await seedFromTranscript($).catch(() => undefined)
     $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
+    // Last, so a host that refuses the tool has the band set up already.
+    await $.tool.register({
+      name: COMPACT_TOOL,
+      description:
+        'Queues a compaction of this conversation that runs as soon as the current turn ends. ' +
+        'Call it only after the person chose to compact. `instructions` is what the summary should keep.',
+      inputSchema: { type: 'object', properties: { instructions: { type: 'string' } } },
+      isDeferred: false,
+    })
     return next(e)
   })
 
@@ -246,6 +298,15 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
     if (e.agentId) return r
+
+    // The compaction the agent asked for during this turn, now that the turn is over. First, so a
+    // failed measure below never drops it.
+    const request = await read($, pendingCompact)
+    if (request !== null) {
+      await update($, pendingCompact, () => null)
+      $.clock.after(0, () => void runCompact($, request.instructions, T.compactFailed))
+    }
+
     const now = await $.clock.now()
     const c = await read($, cache)
     // turn.step stamps the exact request time; when no step of this turn did, the turn's end is the floor.
@@ -253,6 +314,28 @@ export const register: Register = (on, options) => {
     await measure($, lastAt, e.usage?.model ?? null)
     await detectTtl($).catch(() => undefined)
     return r
+  })
+
+  // A new turn is the assess prompt's answer, or the person moving on: the button comes back.
+  on('turn.start', async ($, e, next) => {
+    await update($, isAssessQueued, () => false)
+    return next(e)
+  })
+
+  // The matcher is spelled out so validate can read it: it is COMPACT_TOOL_ID.
+  on('tool.call', { tool: 'mcp__ribbon__compact_after_turn' }, async ($, e) => {
+    const instructions = typeof e.instructions === 'string' ? e.instructions : ''
+    await update($, pendingCompact, () => ({ instructions }))
+    return { result: 'queued', text: 'Compaction queued. It runs when this turn ends.' }
+  })
+
+  // Counts the main conversation's compactions, for the session that started at `startedAt`.
+  on('session.compact', async ($, e, next) => {
+    const result = await next(e)
+    if (e.trigger === 'precompute' || e.agentId || result.messages === undefined) return result
+    const { startedAt } = await $.session.usage()
+    await update($, compactions, c => ({ since: startedAt, count: (c?.since === startedAt ? c.count : 0) + 1 }))
+    return result
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -272,7 +355,25 @@ export const register: Register = (on, options) => {
       const now = await $.clock.now()
       const view = viewOf(await read($, cache), now, ruleTtl(cacheEnv, saved), lang)
 
-      if (saved.length === 0 && !view) {
+      // How close the context is to auto-compaction: the CTX gauge's colour, and from 150k on a
+      // button that asks the agent whether to compact, hand over or carry on.
+      const zone = view && view.window > 0 ? zoneOf(view.tokens, await read($, threshold), view.window) : 'roomy'
+      const assessButton = !view || zone === 'roomy'
+        ? null
+        : (
+            <Box key="assess-box" flexShrink={0} alignItems="flex-start" marginRight={1}>
+              {(await read($, isAssessQueued))
+                ? <Button key="assess" hotkey="a" plain dimColor label={T.assessQueued} onPress={() => {}} />
+                : <Button key="assess" hotkey="a" label={T.assess} onPress={() => assess($, view.tokens, view.window)} />}
+            </Box>
+          )
+      const { startedAt } = await $.session.usage()
+      const counted = await read($, compactions)
+      const compacted = counted !== null && counted.since === startedAt && counted.count > 0
+        ? <Box key="compacted" flexShrink={0} marginRight={2}><Text color={MUTED}>{T.compacted(counted.count)}</Text></Box>
+        : null
+
+      if (saved.length === 0 && !view && !compacted) {
         return (
           <Box paddingX={1}>
             <Text color={MUTED}>{`${T.usage} · ${T.waiting}`}</Text>
@@ -305,7 +406,7 @@ export const register: Register = (on, options) => {
           left,
           fig,
           text: T.figure(fig, used),
-          col: tone === 'calm' && w.kind === 'context' ? VIOLET : TONES[tone],
+          col: w.kind === 'context' ? ZONE_TONES[zone] : TONES[tone],
           name: w.kind === 'context' ? T.ctx : (NAMES[w.kind] ?? w.kind.toUpperCase()),
           d: dots(fig, cells),
           reset: w.note ?? fmtReset(w.resetsAt, now, T.resetting),
@@ -387,6 +488,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="row" paddingX={1}>
             {label}
             {usage}
+            {compacted}
           </Box>
         )
       }
@@ -445,7 +547,9 @@ export const register: Register = (on, options) => {
                 {summary}
               </Box>
             )}
+            {compacted}
             {grow}
+            {assessButton}
             {button}
           </Box>
         )
@@ -467,7 +571,9 @@ export const register: Register = (on, options) => {
                 ) : null}
               </Box>
             )}
+            {compacted}
             {grow}
+            {assessButton}
             {button}
           </Box>
         )
@@ -481,7 +587,9 @@ export const register: Register = (on, options) => {
           <Box key="cache" flexDirection="row" paddingX={1} alignItems="center">
             {badge}
             {summary}
+            {compacted}
             {grow}
+            {assessButton}
             {button}
           </Box>,
         ]

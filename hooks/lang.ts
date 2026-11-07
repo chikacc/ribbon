@@ -1,6 +1,7 @@
 // Every word the band and the card say, in the languages ribbon speaks. Pure: no engine.
-// Durations (3d 9h, 42m) and model names stay as they are in both.
-export type Lang = 'en' | 'zh'
+// Durations (3d 9h, 42m) and model names stay as they are in all of them.
+// zh is Simplified Chinese; zh-TW is Traditional Chinese with Taiwan's terms.
+export type Lang = 'en' | 'zh' | 'zh-TW'
 
 export type Words = {
   usage: string
@@ -39,6 +40,11 @@ export type Words = {
   // The run-out note under the card.
   runsOut: (when: string, clock: string) => string
   pace: (gained: number, over: string, date: string, inn: string) => string
+  // The context: asking the agent whether to compact, and the compactions so far.
+  assess: string
+  assessQueued: string
+  compacted: (n: number) => string
+  compactFailed: (reason: string) => string
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -78,6 +84,10 @@ const en: Words = {
   date: (weekday, day, month) => `${weekday} ${day} ${MONTHS[month - 1]}`,
   runsOut: (when, clock) => `7-day limit runs out ${when}, around ${clock}`,
   pace: (gained, over, date, inn) => `At this week's pace: ${gained}% in ${over} · resets ${date}, in ${inn}`,
+  assess: 'Ask agent',
+  assessQueued: 'Asked',
+  compacted: n => `compacted ${n}x`,
+  compactFailed: reason => `ribbon: compaction did not run, ${reason}`,
 }
 
 const zh: Words = {
@@ -115,9 +125,54 @@ const zh: Words = {
   date: (weekday, day, month) => `${month}月${day}日 ${weekday}`,
   runsOut: (when, clock) => `7天额度将在 ${when} ${clock} 左右用完`,
   pace: (gained, over, date, inn) => `按本周速度:${over} 内用了 ${gained}% · ${date}重置,还有 ${inn}`,
+  assess: '请 agent 评估',
+  assessQueued: '已发送评估',
+  compacted: n => `已压缩 ${n} 次`,
+  compactFailed: reason => `ribbon:压缩没有执行,${reason}`,
 }
 
-export const WORDS: Record<Lang, Words> = { en, zh }
+const zhTW: Words = {
+  usage: '用量',
+  waiting: '等待第一次回應',
+  figure: (n, used) => `${used ? '已用' : '剩餘'} ${n}%`,
+  low: '偏低',
+  resetsLine: r => `${r} 後重設`,
+  resetting: '重設中',
+  show: '展開',
+  hide: '收合',
+  warm: '熱',
+  cold: '冷',
+  you: '目前',
+  leftMin: m => `剩 ${m}m`,
+  idleFor: idle => `閒置 ${idle}`,
+  next: '下則',
+  roboWarm: '機器人,在晃動',
+  roboCold: '機器人,被凍住了',
+  ctx: '上下文',
+  idle: '閒置',
+  reCache: '需重寫快取',
+  inCache: '快取中',
+  nextCosts: cold => (cold ? '下則訊息花費' : '下則訊息花費,命中快取'),
+  warmFor: ttl => `熱 ${ttl}`,
+  coldNow: '已變冷',
+  lastReply: '上次回應',
+  coldIn: m => `${m}m 後變冷`,
+  ofContext: (pct, tokens) => `占 ${tokens} 上下文的 ${pct}%`,
+  altCold: (idle, tokens) => `快取已冷。已閒置 ${idle}。下則訊息要重新快取 ${tokens} 個 token。`,
+  altWarm: (m, tokens) => `快取是熱的。${m} 分鐘後變冷。已快取 ${tokens} 個 token。`,
+  days: ['週日', '週一', '週二', '週三', '週四', '週五', '週六'],
+  dayPart: (day, prev, part, short) =>
+    part === 'night' ? `${prev}夜裡` : `${day}${part === 'morning' ? '上午' : part === 'afternoon' ? '下午' : short ? '下午' : '晚上'}`,
+  date: (weekday, day, month) => `${month}月${day}日 ${weekday}`,
+  runsOut: (when, clock) => `7 天額度將在 ${when} ${clock} 左右用完`,
+  pace: (gained, over, date, inn) => `照本週速度:${over} 內用了 ${gained}% · ${date}重設,還有 ${inn}`,
+  assess: '請 agent 評估',
+  assessQueued: '已送出評估',
+  compacted: n => `已壓縮 ${n} 次`,
+  compactFailed: reason => `ribbon:壓縮沒有執行,${reason}`,
+}
 
-/** The setting as a language: anything but "zh" is English. */
-export const langOf = (setting: unknown): Lang => (setting === 'zh' ? 'zh' : 'en')
+export const WORDS: Record<Lang, Words> = { en, zh, 'zh-TW': zhTW }
+
+/** The setting as a language: anything but "zh" or "zh-TW" is English. */
+export const langOf = (setting: unknown): Lang => (setting === 'zh' || setting === 'zh-TW' ? setting : 'en')

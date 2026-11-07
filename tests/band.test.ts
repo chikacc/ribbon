@@ -16,6 +16,7 @@ const PROPS = {
 
 test('the band shows percent left for each window once a reading lands', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: Date.parse('2098-12-31T22:00:00Z') })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({
@@ -41,6 +42,7 @@ test('the band shows percent left for each window once a reading lands', async (
 
 test('in a narrow band each window stacks, with percent left and reset time on their own lines', async ($, on) => {
   mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: Date.parse('2098-12-31T22:00:00Z') })
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.usage', () => ({
