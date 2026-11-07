@@ -91,7 +91,7 @@ After your first reply, the band also tracks the prompt cache. The cache keeps y
 - **WARM** (red, the robot bobs): the cache is live. It shows the minutes left and what your next message costs.
 - **COLD** (blue, the robot is frozen): the hour has passed. Your next message re-sends the whole chat, so it costs more. It shows the price first.
 
-Click **Show** to open the cache card, and **Hide** to fold it. Warm starts folded. Cold starts open, so you see the price before you send.
+Click **Show** to open the cache card, and **Hide** to fold it. Warm starts folded. Cold starts open, so you see the price before you send; with another mod's band above (next-steps, say) it starts folded too, so the two fit without scrolling, and the row still shows the price.
 
 The card shows how long you've been idle, how many tokens are in the cache, and what the next message costs on each model. Your model is marked **YOU**. See [Up close](#up-close) below.
 

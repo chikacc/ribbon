@@ -503,10 +503,13 @@ export const register: Register = (on, options) => {
       const hue = HUE[mode]
       const mine = mineModel(view)
       const stored = await read($, fold)
-      // Folding needs the card, and the card is a drawing: the terminal stays folded.
-      const open = Svg !== null && (stored && stored.mode === mode ? stored.open : cold)
+      // Folding needs the card, and the card is a drawing: the terminal stays folded. Cold opens by
+      // itself, unless another mod's band sits above: the two together outgrow the band's rows and
+      // it scrolls, while the folded row still shows the price.
+      const opensItself = cold && !above
+      const open = Svg !== null && (stored && stored.mode === mode ? stored.open : opensItself)
       const toggle = () =>
-        update($, fold, f => ({ mode, open: !(f && f.mode === mode ? f.open : mode === 'cold') }))
+        update($, fold, f => ({ mode, open: !(f && f.mode === mode ? f.open : opensItself) }))
 
       const badge = Svg
         ? [
