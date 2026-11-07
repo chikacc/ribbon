@@ -458,3 +458,23 @@ test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xl
   expect(card).toMatch(/font-size=\\"11\\"[^>]*>SONNET</)
   expect(card).not.toContain('font-size=\\"12\\"')
 })
+
+test('the card leaves its box to the markup, so a narrower slot shrinks its height too', async ($, on) => {
+  mock.store(on)
+  on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
+  mock.clock(on, { now: NOW })
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.usage', () => ({ value: { startedAt: 0, context: { window: 1000000 }, rateLimits: WINDOWS } }))
+  on('classic.SessionStart', () => ({}))
+  await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+  await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
+
+  const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const svg = (await band.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('Cache cold'))
+  expect(svg).toBeDefined()
+  expect(svg?.props.width).toBeUndefined()
+  expect(svg?.props.height).toBeUndefined()
+  // The markup keeps its own size and viewBox, which the surface scales as one.
+  expect(svg?.props.source).toContain('viewBox="0 0 1860 ')
+  await band.unmount()
+})

@@ -616,9 +616,11 @@ export const register: Register = (on, options) => {
           }
         : undefined
       const c = cardSvg(view, kind, bandPx(columns), note, cardText)
+        // No width or height: bandPx guesses a cell's pixels, and where the slot is narrower the
+        // drawing shrinks to it. Sized by the markup, its height shrinks along, with no blank below.
         card = (
           <Box key="card" flexDirection="row">
-            <Svg source={c.source} alt={c.alt} width={c.w} height={c.h} isInteractive={kind !== 'tight'} />
+            <Svg source={c.source} alt={c.alt} isInteractive={kind !== 'tight'} />
           </Box>
         )
       }
