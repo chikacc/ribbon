@@ -211,3 +211,21 @@ test('the compact tool queues /compact with its instructions until the turn ends
   await clock.settle()
   expect(host.commands).toHaveLength(1)
 })
+
+test('off the one-row layouts the assess button takes a row of its own, so Show / Hide keeps its room', async ($, on) => {
+  mock.clock(on, { now: STARTED_AT })
+  answerSession(on, 400_000)
+  await resume($, 400_000)
+
+  const wide = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await wide.find({ key: 'assess' })).toBeDefined()
+  expect(await wide.find({ key: 'assess-row' })).toBeUndefined()
+  await wide.unmount()
+
+  for (const bodyColumns of [53, 33]) {
+    const narrow = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
+    expect(await narrow.find({ key: 'assess-row' })).toBeDefined()
+    expect(await narrow.find({ key: 'cache-fold' })).toBeDefined()
+    await narrow.unmount()
+  }
+})

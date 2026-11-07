@@ -581,7 +581,6 @@ export const register: Register = (on, options) => {
             )}
             {compacted}
             {grow}
-            {assessButton}
             {button}
           </Box>
         )
@@ -597,9 +596,16 @@ export const register: Register = (on, options) => {
             {summary}
             {compacted}
             {grow}
-            {assessButton}
             {button}
           </Box>,
+        ]
+      }
+      // Off the one-row layouts the row has no room for the assess button beside Show / Hide:
+      // it takes a row of its own under them.
+      if (!isWide && assessButton) {
+        rows = [
+          ...(Array.isArray(rows) ? rows : [rows]),
+          <Box key="assess-row" flexDirection="row" paddingX={1}>{assessButton}</Box>,
         ]
       }
 
@@ -615,17 +621,18 @@ export const register: Register = (on, options) => {
             ],
           }
         : undefined
-        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. Each tile
-        // names its own size: an interactive one left without it takes a frame's default 300 by 150
-        // px and stretches. A narrow row shows Robo and the chip beside the card already, so the idle
-        // tile leaves them out.
+        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. The idle tile
+        // is a frame, which left without a size takes a frame's default 300 by 150 px and stretches,
+        // so it names its own. The other two are images: without a size they keep their own and
+        // shrink in a slot narrower than they are. A narrow row shows Robo and the chip beside the
+        // card already, so the idle tile leaves them out.
         const tiles = cardTiles(view, cardText, isWide || kind === 'stacked')
         card = (
           <Box key="card" flexDirection="column">
             <Box key="tiles" flexDirection="row" flexWrap="wrap">
               {tiles.map(tile => (
                 <Box key={`tile-${tile.key}`}>
-                  <Svg source={tile.source} alt={tile.alt} width={tile.w} height={tile.h} isInteractive={tile.isInteractive} />
+                  <Svg source={tile.source} alt={tile.alt} isInteractive={tile.isInteractive} {...(tile.isInteractive ? { width: tile.w, height: tile.h } : {})} />
                 </Box>
               ))}
             </Box>
