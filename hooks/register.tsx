@@ -615,16 +615,17 @@ export const register: Register = (on, options) => {
             ],
           }
         : undefined
-        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. No width or
-        // height on a tile: each is drawn at its own size, and shrinks only in a slot narrower than it.
-        // A narrow row shows Robo and the chip beside the card already, so the idle tile leaves them out.
+        // Three tiles in a Box that wraps: the surface lays them out by its own pixels. Each tile
+        // names its own size: an interactive one left without it takes a frame's default 300 by 150
+        // px and stretches. A narrow row shows Robo and the chip beside the card already, so the idle
+        // tile leaves them out.
         const tiles = cardTiles(view, cardText, isWide || kind === 'stacked')
         card = (
           <Box key="card" flexDirection="column">
             <Box key="tiles" flexDirection="row" flexWrap="wrap">
               {tiles.map(tile => (
                 <Box key={`tile-${tile.key}`}>
-                  <Svg source={tile.source} alt={tile.alt} isInteractive={tile.isInteractive} />
+                  <Svg source={tile.source} alt={tile.alt} width={tile.w} height={tile.h} isInteractive={tile.isInteractive} />
                 </Box>
               ))}
             </Box>

@@ -468,7 +468,7 @@ test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xl
   expect(card).not.toContain('font-size=\\"12\\"')
 })
 
-test('each tile leaves its box to the markup, so it draws at its own size and shrinks only in a narrower slot', async ($, on) => {
+test('each tile names its own size, so the idle frame does not stretch to the 300 px frame default', async ($, on) => {
   mock.store(on)
   on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } })) // the host takes the compact tool
   mock.clock(on, { now: NOW })
@@ -481,10 +481,8 @@ test('each tile leaves its box to the markup, so it draws at its own size and sh
   const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   const tiles = (await band.findAll({ type: 'Svg' })).filter(s => String(s.props.source).includes('viewBox="0 0 ') && String(s.props.source).includes(' 118"'))
   expect(tiles).toHaveLength(3)
-  for (const svg of tiles) {
-    expect(svg.props.width).toBeUndefined()
-    expect(svg.props.height).toBeUndefined()
-  }
+  // The three tiles side by side: 202 + 192 + 296 = 690 px, one row in the desktop's chat column.
+  expect(tiles.map(s => [s.props.width, s.props.height])).toEqual([[202, 118], [192, 118], [296, 118]])
   // Only the idle tile animates (Robo), so only it is a frame.
   expect(tiles.map(s => s.props.isInteractive)).toEqual([true, false, false])
   expect(String(tiles[0]?.props.alt)).toContain('Cache cold')
