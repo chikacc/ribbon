@@ -449,3 +449,10 @@ test('cardText: large draws the labels 3 px larger', { options: { cardText: 'lar
   expect(card).toContain('font-size=\\"15\\"')
   expect(card).not.toContain('font-size=\\"12\\"')
 })
+
+test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xlarge' } }, async ($, on) => {
+  const card = await cardOf($, on)
+  expect(card).toContain('font-size=\\"16\\"')
+  expect(card).toContain('font-size=\\"17\\"')
+  expect(card).not.toContain('font-size=\\"12\\"')
+})

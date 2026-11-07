@@ -294,9 +294,9 @@ const CARD_TOP = 6
 export type CardNote = { color: string; lines: string[] }
 
 /** The card's small text (labels, captions, model names: 12 px and under) in px over its own size, by setting. */
-export type CardText = 'small' | 'medium' | 'large'
-export const CARD_TEXT_BUMP: Record<CardText, number> = { small: 0, medium: 2, large: 3 }
-export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' || setting === 'large' ? setting : 'small')
+export type CardText = 'small' | 'medium' | 'large' | 'xlarge'
+export const CARD_TEXT_BUMP: Record<CardText, number> = { small: 0, medium: 2, large: 3, xlarge: 5 }
+export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' || setting === 'large' || setting === 'xlarge' ? setting : 'small')
 
 export const cardSvg = (v: CacheView, kind: Kind, W: number, note?: CardNote, text: CardText = 'small'): { source: string; w: number; h: number; alt: string } => {
   const mode = v.mode

@@ -222,7 +222,7 @@ export const register: Register = (on, options) => {
   const used = options.usage === 'used'
   // userConfig `language`: en (default), zh or zh-TW.
   const lang = langOf(options.language)
-  // userConfig `cardText`: how large the cache card's small text is, small (default), medium or large.
+  // userConfig `cardText`: how large the cache card's small text is, small (default), medium, large or xlarge.
   const cardText = cardTextOf(options.cardText)
   // userConfig `stackGap`: the space between another mod's band above (next-steps, say) and this
   // one, as a step each surface sizes its own way; none (upstream), sm (default) or md.
