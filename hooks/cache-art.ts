@@ -289,7 +289,7 @@ type TextOpts = { size?: number; w?: number; fill?: string; ls?: number; anchor?
 /** The gap between the row and the card, drawn inside each tile. */
 const CARD_TOP = 6
 /** Each tile's height under that gap. */
-export const TILE_H = 132
+export const TILE_H = 112
 
 
 /** The card's small text (labels and captions: 12 px and under; the model names keep theirs) in px over its own size, by setting. */
@@ -301,8 +301,8 @@ export const cardTextOf = (setting: unknown): CardText => (setting === 'medium' 
 export type Tile = { key: 'idle' | 'size' | 'cost'; source: string; w: number; h: number; alt: string; isInteractive: boolean }
 
 /** A model column's width in the cost tile; the last one is as wide as its price needs. */
-const COST_COL = 92
-const COST_LAST = 90
+const COST_COL = 68
+const COST_LAST = 66
 
 /**
  * The card's three tiles. `header` puts Robo and the chip in the idle tile: off where the band's
@@ -329,7 +329,7 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
 
   // How long since the last reply, with Robo and the chip in the header.
   const zoneIdle = (x: number, y: number, w: number) => {
-    const k = { lab: 30, big: 72, bs: 38, line: 96, cap: 120 }
+    const k = { lab: 30, big: 66, bs: 32, line: 84, cap: 106 }
     let g = ''
     if (header) {
       g += roboShapes(x - 2, y + k.lab - 17, 22, mode)
@@ -359,22 +359,22 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
     return g
   }
 
-  // The conversation's size, as a dot grid of the context window: 25 dots a row.
+  // The conversation's size, as a dot grid of the context window: 17 dots a row.
   const share = v.window > 0 ? Math.min(1, v.tokens / v.window) : 0
   const zoneSize = (x: number, y: number) => {
-    const cols = 25
+    const cols = 17
     let g = t(x, y + 30, cold ? L.reCache : L.inCache, { ls: 1.4 })
-    g += `<text x="${x}" y="${y + 72}" font-weight="600" fill="${TEXT}"><tspan font-size="38">${tok(v.tokens)}</tspan><tspan font-size="15" font-weight="500" fill="${MUTED}" dx="7">tokens</tspan></text>`
+    g += `<text x="${x}" y="${y + 66}" font-weight="600" fill="${TEXT}"><tspan font-size="32">${tok(v.tokens)}</tspan><tspan font-size="14" font-weight="500" fill="${MUTED}" dx="7">tokens</tspan></text>`
     const lit = Math.round(share * cols * 2)
     for (let r = 0; r < 2; r++)
-      for (let c = 0; c < cols; c++) g += `<circle cx="${x + 3 + c * 9.6}" cy="${y + 90 + r * 9}" r="3" fill="${r * cols + c < lit ? HUEM : EMPTY}"/>`
-    return g + t(x, y + 120, L.ofContext(Math.round(share * 100), tok(v.window)), { size: 12, w: 500 })
+      for (let c = 0; c < cols; c++) g += `<circle cx="${x + 3 + c * 9.6}" cy="${y + 80 + r * 9}" r="3" fill="${r * cols + c < lit ? HUEM : EMPTY}"/>`
+    return g + t(x, y + 106, L.ofContext(Math.round(share * 100), tok(v.window)), { size: 12, w: 500 })
   }
 
   // What the next message costs, by model. One scale for both states (the cold
   // write's top price), so a warm read shows as the tiny bar it is.
   const zoneCost = (x: number, y: number) => {
-    const k = { lab: 30, base: 116, rows: 8, step: 8, chip: 70, price: 104, name: 120 }
+    const k = { lab: 30, base: 104, rows: 8, step: 7, chip: 58, price: 92, name: 106 }
     let g = t(x, y + k.lab, L.nextCosts(cold), { ls: 1.4 })
     const top = Math.max(...MODELS.map(m => coldCost(rowFor(v, m), v.tokens, v.ttlMin)))
     MODELS.forEach((m, i) => {
@@ -383,10 +383,10 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
       const bx = x + i * COST_COL
       for (let r = 0; r < k.rows; r++)
         for (let c = 0; c < 3; c++)
-          g += `<circle cx="${bx + 3 + c * 8}" cy="${y + k.base - r * k.step}" r="2.8" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
-      if (mine) g += chipShapes(bx + 30, y + k.chip, L.you, HUEM, 10, 0.8).svg
-      g += t(bx + 30, y + k.price, usd(priceOf(v, m)), { size: 17, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
-      g += t(bx + 30, y + k.name, m.NAME, { size: 11, w: 700, fill: mine ? HUEM : MUTED, ls: 0.8, fixed: true })
+          g += `<circle cx="${bx + 3 + c * 6.5}" cy="${y + k.base - r * k.step}" r="2.5" fill="${r < n ? (mine ? HUEM : MUTED) : EMPTY}"/>`
+      if (mine) g += chipShapes(bx + 22, y + k.chip, L.you, HUEM, 10, 0.8).svg
+      g += t(bx + 22, y + k.price, usd(priceOf(v, m)), { size: 15, w: mine ? 700 : 500, fill: mine ? TEXT : MUTED })
+      g += t(bx + 22, y + k.name, m.NAME, { size: 10, w: 700, fill: mine ? HUEM : MUTED, ls: 0, fixed: true })
     })
     return g
   }
@@ -396,8 +396,8 @@ export const cardTiles = (v: CacheView, text: CardText = 'small', header = true)
     : L.altWarm(Math.max(0, v.ttlMin - v.idleMin), tok(v.tokens))
   const costs = MODELS.map(m => `${m.NAME} ${usd(priceOf(v, m))}`).join(', ')
   return [
-    tile('idle', 13 + 290 + 13, zoneIdle(13, 0, 290), alt, true),
-    tile('size', 13 + 260 + 13, zoneSize(13, 0), L.ofContext(Math.round(share * 100), tok(v.window))),
+    tile('idle', 13 + 176 + 13, zoneIdle(13, 0, 176), alt, true),
+    tile('size', 13 + 166 + 13, zoneSize(13, 0), L.ofContext(Math.round(share * 100), tok(v.window))),
     tile('cost', 13 + (MODELS.length - 1) * COST_COL + COST_LAST + 13, zoneCost(13, 0), `${L.nextCosts(cold)}: ${costs}`),
   ]
 }

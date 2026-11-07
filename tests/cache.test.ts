@@ -54,9 +54,10 @@ test('a cold cache opens the card with the re-cache price, and Hide folds it to 
   const card = await band.find({ key: 'card' })
   expect(card).toBeDefined()
   expect(JSON.stringify(card)).toContain('Cache cold. Idle 3d 9h. Next message re-caches 770k tokens.')
-  // Three tiles of their own width in a Box that wraps, whatever the band's columns.
+  // Three tiles of their own width in a Box that wraps, whatever the band's columns: 690 px in all,
+  // so they share one row in the desktop's chat column (about 700 to 750 px wide).
   expect((await band.find({ key: 'tiles' }))?.props.flexWrap).toBe('wrap')
-  for (const w of [316, 286, 392]) expect(JSON.stringify(card)).toContain(`width=\\"${w}\\"`)
+  for (const w of [202, 192, 296]) expect(JSON.stringify(card)).toContain(`width=\\"${w}\\"`)
 
   await band.press({ key: 'cache-fold' })
   expect(await band.find({ key: 'card' })).toBeUndefined()
@@ -439,7 +440,7 @@ const cardOf = async ($: Parameters<import('claude-code/testing').TestBody>[0], 
 test('cardText: small draws the card\'s labels as upstream does', async ($, on) => {
   const card = await cardOf($, on)
   expect(card).toContain('font-size=\\"11\\"')
-  expect(card).toContain('font-size=\\"38\\"')
+  expect(card).toContain('font-size=\\"32\\"')
 })
 
 test('cardText: medium draws the labels 2 px larger and leaves the big figures alone', { options: { cardText: 'medium' } }, async ($, on) => {
@@ -448,7 +449,7 @@ test('cardText: medium draws the labels 2 px larger and leaves the big figures a
   expect(card).not.toContain('font-size=\\"12\\"')
   expect(card).toContain('font-size=\\"13\\"')
   expect(card).toContain('font-size=\\"14\\"')
-  expect(card).toContain('font-size=\\"38\\"')
+  expect(card).toContain('font-size=\\"32\\"')
 })
 
 test('cardText: large draws the labels 3 px larger', { options: { cardText: 'large' } }, async ($, on) => {
@@ -462,8 +463,8 @@ test('cardText: xlarge draws the labels 5 px larger', { options: { cardText: 'xl
   const card = await cardOf($, on)
   expect(card).toContain('font-size=\\"16\\"')
   expect(card).toContain('font-size=\\"17\\"')
-  // The model names keep 11 px, so SONNET stays inside its column.
-  expect(card).toMatch(/font-size=\\"11\\"[^>]*>SONNET</)
+  // The model names keep 10 px, so SONNET stays inside its column.
+  expect(card).toMatch(/font-size=\\"10\\"[^>]*>SONNET</)
   expect(card).not.toContain('font-size=\\"12\\"')
 })
 
@@ -478,7 +479,7 @@ test('each tile leaves its box to the markup, so it draws at its own size and sh
   await $.classic.SessionStart({ source: 'resume', seconds_since_last_response: COLD_IDLE, context_tokens: 770000, model: 'claude-opus-5-5' })
 
   const band = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  const tiles = (await band.findAll({ type: 'Svg' })).filter(s => String(s.props.source).includes('viewBox="0 0 ') && String(s.props.source).includes(' 138"'))
+  const tiles = (await band.findAll({ type: 'Svg' })).filter(s => String(s.props.source).includes('viewBox="0 0 ') && String(s.props.source).includes(' 118"'))
   expect(tiles).toHaveLength(3)
   for (const svg of tiles) {
     expect(svg.props.width).toBeUndefined()
