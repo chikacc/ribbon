@@ -1,7 +1,7 @@
 {
   "name": "ribbon",
-  "version": "1.5.0",
-  "description": "A slim band above the prompt: how much of your 5-hour and 7-day usage is left, when each resets, whether the prompt cache is warm or cold with what the next message costs, and how close the context is to auto-compaction, with a button that asks the agent whether to compact.",
+  "version": "1.6.0",
+  "description": "A slim band above the prompt: how much of your 5-hour and 7-day usage is left, when each resets, whether the prompt cache is warm or cold with what the next message costs, and how close the context is to auto-compaction.",
   "author": { "name": "Jay E", "url": "https://robonuggets.com" },
   "homepage": "https://github.com/chikacc/ribbon",
   "repository": "https://github.com/chikacc/ribbon",

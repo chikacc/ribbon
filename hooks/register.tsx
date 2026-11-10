@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { CacheFacts, Compactions, Fold, PendingCompact, Window } from '../types'
-import { COMPACT_TOOL, assessPrompt, zoneOf } from './assess'
+import { COMPACT_TOOL, zoneOf } from './assess'
 import {
   HUE, INK, ROBO_SIZE, TONES, TTL_MIN, ZONE_TONES,
   cardTextOf, cardTiles, chipSvg, familyOf, fmtIdle, kindOf, mineModel, olderRate, priceOf, roboSvg, tok, usd,
@@ -25,9 +25,8 @@ import { OUT_ALERT, clockOf, dateOf, dayPart, runOutOf, toneOf } from './pace'
 // it reads the engine's own figures and draws.
 //
 // The CTX gauge is coloured by how close the context is to auto-compaction (assess.ts).
-// From 150k tokens on, an "Ask agent" button submits a prompt, only when the person
-// presses it, asking the agent whether to compact, hand over or carry on; the agent
-// compacts through the compact_after_turn tool once the person picks it.
+// The agent compacts through the compact_after_turn tool once the person picks compaction;
+// the band itself never submits a prompt.
 
 // Theme keys, so the band's text follows the person's light or dark theme.
 const TEXT = 'text'
@@ -52,7 +51,6 @@ const cache = atom({ plugin: 'ribbon', key: 'cache' } as const, null as CacheFac
 const fold = atom({ plugin: 'ribbon', key: 'fold' } as const, null as Fold | null)
 const threshold = atom({ plugin: 'ribbon', key: 'threshold' } as const, null as number | null)
 const compactions = atom({ plugin: 'ribbon', key: 'compactions' } as const, null as Compactions | null)
-const isAssessQueued = atom({ plugin: 'ribbon', key: 'isAssessQueued' } as const, false)
 const pendingCompact = atom({ plugin: 'ribbon', key: 'pendingCompact' } as const, null as PendingCompact | null)
 
 const NAMES: Record<string, string> = { seven_day: '7D', five_hour: '5H', spend_limit: 'SPEND', context: 'CTX' }
@@ -200,18 +198,6 @@ const measure = async ($: EngineInterface, lastAt: number | null, model: string 
   }))
 }
 
-/** Asks the agent whether to compact, hand over or carry on; only ever from the person's press. */
-const assess = async ($: EngineInterface, tokens: number, window: number): Promise<void> => {
-  await update($, isAssessQueued, () => true)
-  const limit = await read($, threshold)
-  try {
-    await $.prompt.submit({ text: assessPrompt(tok(tokens), tok(window), limit === null ? null : tok(limit)) })
-  } catch (error) {
-    await update($, isAssessQueued, () => false)
-    $.ui.toast(String(error), { timeoutMs: 10_000 })
-  }
-}
-
 // `$.session.compact` is refused on the desktop host; the /compact command runs once the session is idle.
 const runCompact = async ($: EngineInterface, instructions: string, toast: (reason: string) => string): Promise<void> => {
   try {
@@ -325,12 +311,6 @@ export const register: Register = (on, options) => {
     return r
   })
 
-  // A new turn is the assess prompt's answer, or the person moving on: the button comes back.
-  on('turn.start', async ($, e, next) => {
-    await update($, isAssessQueued, () => false)
-    return next(e)
-  })
-
   // The matcher is spelled out so validate can read it: it is COMPACT_TOOL_ID.
   on('tool.call', { tool: 'mcp__ribbon__compact_after_turn' }, async ($, e) => {
     const instructions = typeof e.instructions === 'string' ? e.instructions : ''
@@ -364,18 +344,8 @@ export const register: Register = (on, options) => {
       const now = await $.clock.now()
       const view = viewOf(await read($, cache), now, ruleTtl(cacheEnv, saved), lang)
 
-      // How close the context is to auto-compaction: the CTX gauge's colour, and from 150k on a
-      // button that asks the agent whether to compact, hand over or carry on.
+      // How close the context is to auto-compaction: the CTX gauge's colour.
       const zone = view && view.window > 0 ? zoneOf(view.tokens, await read($, threshold), view.window) : 'roomy'
-      const assessButton = !view || zone === 'roomy'
-        ? null
-        : (
-            <Box key="assess-box" flexShrink={0} alignItems="flex-start" marginRight={1}>
-              {(await read($, isAssessQueued))
-                ? <Button key="assess" hotkey="a" plain dimColor label={T.assessQueued} onPress={() => {}} />
-                : <Button key="assess" hotkey="a" label={T.assess} onPress={() => assess($, view.tokens, view.window)} />}
-            </Box>
-          )
       const { startedAt } = await $.session.usage()
       const counted = await read($, compactions)
       const compacted = counted !== null && counted.since === startedAt && counted.count > 0
@@ -399,7 +369,7 @@ export const register: Register = (on, options) => {
       const compact = columns >= COMPACT_AT && columns < fullAt
       const isWide = kind === 'wide' || compact
       const cells = compact ? COMPACT_CELLS : kind === 'tight' ? TIGHT_CELLS : CELLS
-      // The context gauge shows at every width: it is what the assess button weighs. The rows wrap,
+      // The context gauge shows at every width. The rows wrap,
       // so where it does not fit beside the windows it moves to the next line, whole.
       const ctx: Window[] =
         view && hasCtx
@@ -565,7 +535,6 @@ export const register: Register = (on, options) => {
             )}
             {compacted}
             {grow}
-            {assessButton}
             {button}
           </Box>
         )
@@ -610,14 +579,6 @@ export const register: Register = (on, options) => {
             {grow}
             {button}
           </Box>,
-        ]
-      }
-      // Off the one-row layouts the row has no room for the assess button beside Show / Hide:
-      // it takes a row of its own under them.
-      if (!isWide && assessButton) {
-        rows = [
-          ...(Array.isArray(rows) ? rows : [rows]),
-          <Box key="assess-row" flexDirection="row" paddingX={1}>{assessButton}</Box>,
         ]
       }
 

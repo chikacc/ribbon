@@ -3,7 +3,7 @@ import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 // The context-meter behaviours, as ribbon carries them: the CTX gauge coloured by how close the
-// context is to auto-compaction, the button that asks the agent, the compact tool, the count.
+// context is to auto-compaction, the compact tool, the count.
 
 const STARTED_AT = Date.parse('2098-12-31T22:00:00Z')
 const THRESHOLD = 967_000
@@ -25,9 +25,9 @@ const YELLOW = '#e0b000'
 const RED = '#d64545'
 
 // The engine beneath the plugin: a session on a 1M window whose context holds `tokens`, another
-// mod's band drawn beneath ribbon, and what the plugin submitted and ran.
+// mod's band drawn beneath ribbon, and what the plugin ran.
 const answerSession = (on: On, tokens: number) => {
-  const host = { tokens, prompts: [] as string[], commands: [] as { command: string; args?: string }[] }
+  const host = { tokens, commands: [] as { command: string; args?: string }[] }
   mock.store(on)
   on('tool.register', () => ({ value: { tool: 'mcp__ribbon__compact_after_turn' } }))
   on('session.model', () => ({ value: 'claude-opus-5-5' }))
@@ -43,10 +43,6 @@ const answerSession = (on: On, tokens: number) => {
       rateLimits: WINDOWS,
     },
   }) as never)
-  on('prompt.submit', async (_$, e) => {
-    host.prompts.push(e.text)
-    return { text: e.text }
-  })
   on('command.run', async (_$, e) => {
     host.commands.push({ command: e.command, args: e.args })
     return {}
@@ -73,53 +69,25 @@ const resume = async ($: T$, tokens: number) => {
 const completeTurn = ($: T$, turnId: string) =>
   $.turn.complete({ answer: 'done', durationMs: 1000, isAborted: false, turnId, reason: 'answer' })
 
-test('below 150k the CTX gauge is blue, there is no button, and the band beneath still draws', async ($, on) => {
+test('below 150k the CTX gauge is blue, and the band beneath still draws', async ($, on) => {
   mock.clock(on, { now: STARTED_AT })
   answerSession(on, 122_000)
   await resume($, 122_000)
 
   const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect((await ui.find({ type: 'Text', text: ' 87.8% left' }))?.props.color).toBe(BLUE)
-  expect(await ui.find({ key: 'assess' })).toBeUndefined()
   expect(await ui.find({ key: 'compacted' })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: 'next: from beneath' })).toBeDefined()
   await ui.unmount()
 })
 
-test('from 150k the button asks the agent with the token count and the threshold', { options: { language: 'zh-TW' } }, async ($, on) => {
-  mock.clock(on, { now: STARTED_AT })
-  const host = answerSession(on, 400_000)
-  await resume($, 400_000)
-
-  const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  const button = await ui.find({ key: 'assess' })
-  expect(button?.props.label).toBe('請 agent 評估')
-  expect(button?.props.hotkey).toBe('a')
-  await ui.press({ key: 'assess' })
-  expect(host.prompts).toHaveLength(1)
-  expect(host.prompts[0]).toContain('上下文已用 400k / 1M，自動壓縮門檻 967k。')
-  expect(host.prompts[0]).toContain('AskUserQuestion')
-  expect(host.prompts[0]).toContain('預設建議移交')
-  expect(host.prompts[0]).toContain('mcp__ribbon__compact_after_turn')
-  expect((await ui.find({ key: 'assess' }))?.props.label).toBe('已送出評估')
-
-  // A second press while the prompt waits sends nothing more; the next turn brings the button back.
-  await ui.press({ key: 'assess' })
-  expect(host.prompts).toHaveLength(1)
-  await $.turn.start({ text: host.prompts[0] ?? '', turnId: 't1' })
-  expect((await ui.find({ key: 'assess' }))?.props.label).toBe('請 agent 評估')
-  expect(await ui.find({ type: 'Text', text: 'next: from beneath' })).toBeDefined()
-  await ui.unmount()
-})
-
-test('at 90% of the threshold the CTX gauge turns red and keeps the button', async ($, on) => {
+test('at 90% of the threshold the CTX gauge turns red', async ($, on) => {
   mock.clock(on, { now: STARTED_AT })
   answerSession(on, 880_000)
   await resume($, 880_000)
 
   const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect((await ui.find({ type: 'Text', text: ' 12% left' }))?.props.color).toBe(RED)
-  expect((await ui.find({ key: 'assess' }))?.props.label).toBe('Ask agent')
   await ui.unmount()
 })
 
@@ -130,7 +98,6 @@ test('between 150k and 90% of the threshold the CTX gauge is yellow', async ($, 
 
   const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect((await ui.find({ type: 'Text', text: ' 40% left' }))?.props.color).toBe(YELLOW)
-  expect(await ui.find({ key: 'assess' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -212,25 +179,7 @@ test('the compact tool queues /compact with its instructions until the turn ends
   expect(host.commands).toHaveLength(1)
 })
 
-test('off the one-row layouts the assess button takes a row of its own, so Show / Hide keeps its room', async ($, on) => {
-  mock.clock(on, { now: STARTED_AT })
-  answerSession(on, 400_000)
-  await resume($, 400_000)
-
-  const wide = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  expect(await wide.find({ key: 'assess' })).toBeDefined()
-  expect(await wide.find({ key: 'assess-row' })).toBeUndefined()
-  await wide.unmount()
-
-  for (const bodyColumns of [53, 33]) {
-    const narrow = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
-    expect(await narrow.find({ key: 'assess-row' })).toBeDefined()
-    expect(await narrow.find({ key: 'cache-fold' })).toBeDefined()
-    await narrow.unmount()
-  }
-})
-
-test('the context gauge shows at every width, so its colour and the assess button go together', async ($, on) => {
+test('the context gauge shows at every width, with Show / Hide beside it', async ($, on) => {
   mock.clock(on, { now: STARTED_AT })
   answerSession(on, 600_000)
   await resume($, 600_000)
@@ -238,18 +187,18 @@ test('the context gauge shows at every width, so its colour and the assess butto
   for (const bodyColumns of [150, 80, 53, 33]) {
     const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns } })
     expect(await ui.find({ type: 'Text', text: /^CTX ?$/ }), `CTX at ${bodyColumns} columns`).toBeDefined()
-    expect(await ui.find({ key: 'assess' })).toBeDefined()
+    expect(await ui.find({ key: 'cache-fold' }), `Show / Hide at ${bodyColumns} columns`).toBeDefined()
     await ui.unmount()
   }
 })
 
-test('the rows part by a small step, so the assess row does not touch the Show / Hide one', async ($, on) => {
+test('the rows part by a small step, so the cache row does not touch the usage one', async ($, on) => {
   mock.clock(on, { now: STARTED_AT })
   answerSession(on, 400_000)
   await resume($, 400_000)
 
   const ui = await $.ui.mount({ plugin: 'ribbon', surface: 'desktop', component: 'AbovePrompt', props: { ...PROPS, bodyColumns: 33 } })
-  expect(await ui.find({ key: 'assess-row' })).toBeDefined()
+  expect(await ui.find({ key: 'cache-fold' })).toBeDefined()
   expect((await ui.find({ key: 'rows' }))?.props.rowGap).toBe('xs')
   await ui.unmount()
 })

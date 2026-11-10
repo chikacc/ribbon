@@ -40,9 +40,7 @@ export type Words = {
   // The run-out note under the card.
   runsOut: (when: string, clock: string) => string
   pace: (gained: number, over: string, date: string, inn: string) => string
-  // The context: asking the agent whether to compact, and the compactions so far.
-  assess: string
-  assessQueued: string
+  // The context: the compactions so far.
   compacted: (n: number) => string
   compactFailed: (reason: string) => string
 }
@@ -84,8 +82,6 @@ const en: Words = {
   date: (weekday, day, month) => `${weekday} ${day} ${MONTHS[month - 1]}`,
   runsOut: (when, clock) => `7-day limit runs out ${when}, around ${clock}`,
   pace: (gained, over, date, inn) => `At this week's pace: ${gained}% in ${over} · resets ${date}, in ${inn}`,
-  assess: 'Ask agent',
-  assessQueued: 'Asked',
   compacted: n => `compacted ${n}x`,
   compactFailed: reason => `ribbon: compaction did not run, ${reason}`,
 }
@@ -125,8 +121,6 @@ const zh: Words = {
   date: (weekday, day, month) => `${month}月${day}日 ${weekday}`,
   runsOut: (when, clock) => `7天额度将在 ${when} ${clock} 左右用完`,
   pace: (gained, over, date, inn) => `按本周速度:${over} 内用了 ${gained}% · ${date}重置,还有 ${inn}`,
-  assess: '请 agent 评估',
-  assessQueued: '已发送评估',
   compacted: n => `已压缩 ${n} 次`,
   compactFailed: reason => `ribbon:压缩没有执行,${reason}`,
 }
@@ -166,8 +160,6 @@ const zhTW: Words = {
   date: (weekday, day, month) => `${month}月${day}日 ${weekday}`,
   runsOut: (when, clock) => `7 天額度將在 ${when} ${clock} 左右用完`,
   pace: (gained, over, date, inn) => `照本週速度:${over} 內用了 ${gained}% · ${date}重設,還有 ${inn}`,
-  assess: '請 agent 評估',
-  assessQueued: '已送出評估',
   compacted: n => `已壓縮 ${n} 次`,
   compactFailed: reason => `ribbon:壓縮沒有執行,${reason}`,
 }

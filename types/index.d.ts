@@ -31,8 +31,6 @@ declare module 'claude-code' {
       /** The auto-compaction threshold in tokens, read at each turn end; null while auto-compaction is off. */
       threshold: number | null
       compactions: Compactions | null
-      /** The assess prompt went out and its turn has not started yet. */
-      isAssessQueued: boolean
       pendingCompact: PendingCompact | null
     }
   }

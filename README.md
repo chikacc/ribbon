@@ -7,7 +7,6 @@
 > **This fork** ([chikacc/ribbon](https://github.com/chikacc/ribbon)) builds on [henryz78/ribbon](https://github.com/henryz78/ribbon), itself a fork of [robonuggets/ribbon](https://github.com/robonuggets/ribbon). On top of it the band:
 >
 > - colours **CTX** by how close the context is to auto-compaction: blue under 150k tokens, yellow from 150k to 90% of the auto-compaction threshold, red past that;
-> - from 150k on, shows an **Ask agent** button (hotkey `a`) that submits a prompt asking the agent whether to compact, hand over to a new session or carry on, as a question with its pick first;
 > - registers the tool `mcp__ribbon__compact_after_turn`: once the person picks compaction, the agent calls it with what the summary should keep, and the band runs `/compact <instructions>` as the turn ends (`$.session.compact` is refused on the desktop host, so it goes through `$.command.run`);
 > - counts the session's compactions (`compacted 2x`);
 > - speaks Traditional Chinese with `language: zh-TW`.
@@ -82,7 +81,7 @@ In a Claude Code terminal session, type:
 Open `/config` and find **ribbon**, or run `claude plugin configure ribbon@chikacc`.
 
 - **Usage figure:** `left` (default) shows how much of each window and of the context is left. `used` shows how much is spent, and the dots fill with it. LOW still means under 15% left.
-- **Language:** `en` (default), `zh` or `zh-TW`. `zh` writes the band, the buttons and the cache card in Simplified Chinese, `zh-TW` in Traditional Chinese. Durations (`3d 9h`, `42m`) and model names stay as they are in all of them. The Ask agent prompt is in Traditional Chinese whatever the setting.
+- **Language:** `en` (default), `zh` or `zh-TW`. `zh` writes the band, the buttons and the cache card in Simplified Chinese, `zh-TW` in Traditional Chinese. Durations (`3d 9h`, `42m`) and model names stay as they are in all of them.
 
 ### The prompt cache
 
@@ -106,7 +105,7 @@ The card shows how long you've been idle, how many tokens are in the cache, and 
 
 ## Good to know
 
-- **It costs nothing to run.** It reads the app's own numbers and draws them. It never calls a model on its own: the only prompt it sends is the Ask agent one, when you press the button.
+- **It costs nothing to run.** It reads the app's own numbers and draws them. It never calls a model and never submits a prompt on its own.
 - **Prices are estimates.** They come from a price table in `hooks/cache-art.ts` (`MODELS`), not from your bill. If prices change, edit that table.
 - **Older models are priced as themselves.** The table in `hooks/cache-art.ts` has the 5.5 rows, and `OLDER` lists the rate of each older model by id (Sonnet 4.5, Opus 4.1, and so on).
 - **The cache length is worked out, not assumed.** 5 minutes or 1 hour: from Claude Code's cache settings (`FORCE_PROMPT_CACHING_5M`, `CLAUDE_CODE_PROMPT_CACHE_TTL`, `ENABLE_PROMPT_CACHING_1H`), then the plan (a subscription within its limits gets 1 hour, an API key 5 minutes), then what your own requests show.
@@ -122,7 +121,7 @@ ribbon/
 ├── hooks/
 │   ├── hooks.json          points to the module
 │   ├── register.tsx        the band: usage, cache tracking, layout, the compact tool
-│   ├── assess.ts           the context zones and the Ask agent prompt
+│   ├── assess.ts           the context zones and the compact tool name
 │   ├── cache-art.ts        the cache card and robot drawings, the price table
 │   └── font.ts             Outfit, embedded so the drawings render anywhere
 ├── types/index.d.ts        the shape of what the band remembers
